@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Joshua Luxury Store</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/history@5/umd/history.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-router@6/umd/react-router.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-router-dom@6/umd/react-router-dom.development.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: serif;
+        }
+        .logo img {
+            width: 90px;
+            height: 90px;
+            object-fit: contain;
+            object-position: center;
+            display: block;
+            background: transparent;
+            border-radius: 50%;
+            padding: 4px;
+        }
+        @media (max-width: 768px) {
+           .logo img {
+              width: 65px;
+              height: 65px;
+           }
+        }
+    </style>
+</head>
+<body class="bg-[#0b0b0b] text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { HashRouter, Routes, Route, useNavigate } = ReactRouterDOM;
+
+        // Text-to-speech for admin notifications
+        const speakNotification = (message) => {
+            try {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(message);
+                    utterance.rate = 1;
+                    utterance.pitch = 1;
+                    utterance.volume = 1;
+                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.speak(utterance);
+                }
+            } catch (e) {
+                console.log('Speech synthesis not supported:', e);
+            }
+        };
+
+        // Trigger admin notification with text-to-speech
+        const triggerAdminNotification = (type) => {
+            const messages = {
+                newUser: 'new user just signed up',
+                productApproval: 'A product for approval is waiting for you',
+                newOrder: 'New order has been placed in your marketplace go check it now',
+                verification: 'A verification request is here be careful and go check it',
+                sellerRequest: 'A new worker want to join your team approve the seller product',
+            };
+            speakNotification(messages[type] || 'New notification');
+        };
+
+        const mockUsers = [
+            { id: '1', name: 'John Doe', email: 'john@example.com', status: 'Active', joined: '2024-01-15' },
+            { id: '2', name: 'Jane Smith', email: 'jane@example.com', status: 'Active', joined: '2024-02-20' },
+            { id: '3', name: 'Bob Johnson', email: 'bob@example.com', status: 'Suspended', joined: '2024-03-10' },
+        ];
+
+        const getUsers = () => {
+            const stored = localStorage.getItem('jmpUsers');
+            return stored ? JSON.parse(stored) : mockUsers;
+        };
+
+        const mockOrders = [
+            { id: 'ORD001', user: 'John Doe', product: 'Sovereign Gold Watch', status: 'Pending', amount: '₦12,800', date: '2024-05-01' },
+            { id: 'ORD002', user: 'Jane Smith', product: 'Palatial Diamond Ring', status: 'Shipped', amount: '₦18,600', date: '2024-04-28' },
+            { id: 'ORD003', user: 'Bob Johnson', product: 'Velvet Heritage Bag', status: 'Delivered', amount: '₦3,400', date: '2024-04-25' },
+        ];
+
+        const mockProducts = [
+            { id: '1', title: 'Sovereign Gold Watch', status: 'Approved', category: 'Watches', price: '₦12,800' },
+            { id: '2', title: 'Palatial Diamond Ring', status: 'Pending', category: 'Jewelry', price: '₦18,600' },
+            { id: '3', title: 'Velvet Heritage Bag', status: 'Rejected', category: 'Bags', price: '₦3,400' },
+        ];
+
+        const getProducts = () => {
+            const stored = localStorage.getItem('jmpProducts');
+            return stored ? JSON.parse(stored) : mockProducts;
+        };
+
+        const AdminDashboard = () => {
+            const navigate = useNavigate();
+            const [activeSection, setActiveSection] = useState('users');
+            const [users, setUsers] = useState(getUsers());
+            const [userSearch, setUserSearch] = useState('');
+            const [orderSearch, setOrderSearch] = useState('');
+            const [orders, setOrders] = useState([]);
+            const [products, setProducts] = useState(getProducts());
+
+            const [showRejectModal, setShowRejectModal] = useState(false);
+            const [rejectReason, setRejectReason] = useState('');
+            const [rejectingProductId, setRejectingProductId] = useState(null);
+            
+            const [expandedVerificationId, setExpandedVerificationId] = useState(null);
+            const [verificationRejectReasons, setVerificationRejectReasons] = useState({});
+            const [showImageModal, setShowImageModal] = useState(false);
+            const [selectedImage, setSelectedImage] = useState(null);
+
+            const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
+            const [selectedUser, setSelectedUser] = useState(null);
+            const [selectedOrder, setSelectedOrder] = useState(null);
+            const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
+            const [selectedProduct, setSelectedProduct] = useState(null);
+            const [showProductDetailsModal, setShowProductDetailsModal] = useState(false);
+            const [showBanConfirmation, setShowBanConfirmation] = useState(false);
+            const [banPin, setBanPin] = useState('');
+            const [showBanPinModal, setShowBanPinModal] = useState(false);
+            const [banTargetUser, setBanTargetUser] = useState(null);
+            const [notificationPopup, setNotificationPopup] = useState(null);
+            const [lastNotificationId, setLastNotificationId] = useState(null);
+
+            const openBrowserNotification = (message) => {
+                if (!('Notification' in window)) return;
+                if (Notification.permission === 'granted') {
+                    try {
+                        new Notification(message.title, { body: message.content });
+                    } catch (error) {
+                        console.error('Browser notification failed:', error);
+                    }
+                } else if (Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            try {
+                                new Notification(message.title, { body: message.content });
+                            } catch (error) {
+                                console.error('Browser notification failed:', error);
+                            }
+                        }
+                    });
+                }
+            };
+
+            const showNotification = (message) => {
+                if (!message) return;
+                setNotificationPopup(message);
+                openBrowserNotification(message);
+                window.setTimeout(() => setNotificationPopup(null), 6000);
+            };
+
+            useEffect(() => {
+                const isAdmin = localStorage.getItem('jmpAdminAccess');
+                if (isAdmin !== 'true') {
+                    window.location.href = './index.html';
+                    return;
+                }
+                
+                // Request notification permission
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
+                
+                loadOrders();
+            }, []);
+
+            useEffect(() => {
+                const refreshUsers = () => {
+                    const updatedUsers = getUsers();
+                    
+                    // Check for new users
+                    if (users.length < updatedUsers.length) {
+                        triggerAdminNotification('newUser');
+                    }
+                    
+                    setUsers(updatedUsers);
+                    if (selectedUser) {
+                        const refreshed = updatedUsers.find(u => u.id === selectedUser.id || u.email === selectedUser.email);
+                        setSelectedUser(refreshed || null);
+                    }
+                };
+
+                const handleStorage = (event) => {
+                    if (event.key === 'jmpMessages') {
+                        try {
+                            const msgList = JSON.parse(event.newValue || '[]');
+                            const latest = msgList[msgList.length - 1];
+                            if (latest && latest.id !== lastNotificationId) {
+                                setLastNotificationId(latest.id);
+                                showNotification(latest);
+                            }
+                        } catch (error) {
+                            console.error('Error parsing messages from storage event:', error);
+                        }
+                    }
+
+                    if (event.key === 'jmpUsers') {
+                        refreshUsers();
+                    }
+                };
+
+                const handleUserUpdated = () => {
+                    refreshUsers();
+                };
+
+                window.addEventListener('storage', handleStorage);
+                window.addEventListener('userUpdated', handleUserUpdated);
+                return () => {
+                    window.removeEventListener('storage', handleStorage);
+                    window.removeEventListener('userUpdated', handleUserUpdated);
+                };
+            }, [lastNotificationId, selectedUser]);
+
+            // Monitor for new orders
+            useEffect(() => {
+                const handleOrderUpdate = (event) => {
+                    if (event.key === 'jmpOrders') {
+                        const newOrders = JSON.parse(event.newValue || '[]');
+                        const currentOrders = JSON.parse(event.oldValue || '[]');
+                        
+                        // Check if there are new orders
+                        if (newOrders.length > currentOrders.length) {
+                            triggerAdminNotification('newOrder');
+                        }
+                        
+                        loadOrders();
+                    }
+                };
+                
+                window.addEventListener('storage', handleOrderUpdate);
+                return () => window.removeEventListener('storage', handleOrderUpdate);
+            }, []);
+
+            const loadOrders = () => {
+                const stored = localStorage.getItem('jmpOrders');
+                setOrders(stored ? JSON.parse(stored) : []);
+            };
+
+            const updateOrderStatus = (orderId, newStatus) => {
+                // Update orders list and persist
+                const updated = orders.map(order =>
+                    order.id === orderId ? { ...order, status: newStatus } : order
+                );
+                setOrders(updated);
+                localStorage.setItem('jmpOrders', JSON.stringify(updated));
+
+                const order = updated.find(o => o.id === orderId);
+                if (!order) return;
+
+                // Prepare message content per status
+                let title = '';
+                let content = '';
+                if (newStatus === 'Ready for Pickup') {
+                    title = 'Order Ready for Pickup';
+                    content = `Your order ${order.id} is ready for pickup at New Yidi Road, Yinolu Pharmacy, Irewolede, Ilorin, Kwara State. Transfer payment to: Bank: Opay, Name: Bamikole Victoria Kehinde, A/C: 7070252673`;
+                } else if (newStatus === 'Cancelled') {
+                    title = 'Order Cancelled';
+                    content = `Your order ${order.id} has been cancelled by the admin. If you have questions, please contact support.`;
+                } else {
+                    title = `Order ${newStatus}`;
+                    content = `Your order ${order.id} status has been updated to ${newStatus}.`;
+                }
+
+                const messages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+
+                // Send message to buyer
+                messages.push({
+                    id: Date.now().toString() + Math.random(),
+                    recipientEmail: order.buyerEmail,
+                    title,
+                    content,
+                    orderId: order.id,
+                    time: new Date().toLocaleString(),
+                    read: false
+                });
+
+                // Send message to each seller involved in the order (unique)
+                const sellerEmails = Array.from(new Set((order.products || []).map(p => p.userEmail).filter(Boolean)));
+                sellerEmails.forEach(email => {
+                    messages.push({
+                        id: Date.now().toString() + Math.random(),
+                        recipientEmail: email,
+                        title: `Order ${order.id} - ${newStatus}`,
+                        content: `Order ${order.id} containing your product has changed status to ${newStatus}. Please check your orders.`,
+                        orderId: order.id,
+                        time: new Date().toLocaleString(),
+                        read: false
+                    });
+                });
+
+                localStorage.setItem('jmpMessages', JSON.stringify(messages));
+            };
+
+            const viewOrderDetails = (order) => {
+                setSelectedOrder(order);
+                setShowOrderDetailsModal(true);
+            };
+
+            const updateProductStatus = (productId, newStatus, reason = null) => {
+                if (newStatus === 'Rejected') {
+                    if (!reason) {
+                        // If no reason, open modal
+                        setRejectingProductId(productId);
+                        setShowRejectModal(true);
+                        return;
+                    }
+                    // Send message
+                    const product = products.find(p => p.id === productId);
+                    if (product) {
+                        const messages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                        messages.push({
+                            id: Date.now().toString(),
+                            recipientEmail: product.userEmail,
+                            title: 'Product Rejected',
+                            content: `Your product "${product.title}" was rejected: ${reason}`,
+                            time: new Date().toLocaleString(),
+                            read: false
+                        });
+                        localStorage.setItem('jmpMessages', JSON.stringify(messages));
+                    }
+                } else if (newStatus === 'Approved') {
+                    // Trigger admin notification when product is approved
+                    triggerAdminNotification('productApproval');
+                }
+                
+                const updated = products.map(product =>
+                    product.id === productId ? { ...product, status: newStatus } : product
+                );
+                setProducts(updated);
+                localStorage.setItem('jmpProducts', JSON.stringify(updated));
+            };
+
+            const handleRejectSubmit = () => {
+                if (!rejectReason.trim()) {
+                    alert('Please provide a reason for rejection.');
+                    return;
+                }
+                updateProductStatus(rejectingProductId, 'Rejected', rejectReason);
+                setShowRejectModal(false);
+                setRejectReason('');
+                setRejectingProductId(null);
+            };
+
+            const deleteProduct = (productId) => {
+                if (confirm('Are you sure you want to delete this product?')) {
+                    const updated = products.filter(product => product.id !== productId);
+                    setProducts(updated);
+                    localStorage.setItem('jmpProducts', JSON.stringify(updated));
+                }
+            };
+
+            const toggleProductPause = (productId) => {
+                const updated = products.map(product =>
+                    product.id === productId ? { ...product, paused: !product.paused } : product
+                );
+                setProducts(updated);
+                localStorage.setItem('jmpProducts', JSON.stringify(updated));
+            };
+
+            const toggleUserVerification = (userId) => {
+                const updated = users.map(user =>
+                    (user.id === userId || user.username === userId) ? { ...user, verified: !user.verified } : user
+                );
+                
+                // Find if user is being verified
+                const targetUser = updated.find(u => u.id === userId || u.username === userId);
+                if (targetUser && targetUser.verified) {
+                    // Trigger admin notification when user is verified
+                    triggerAdminNotification('verification');
+                }
+                
+                setUsers(updated);
+                localStorage.setItem('jmpUsers', JSON.stringify(updated));
+            };
+
+            const viewUserDetails = (userId) => {
+                const user = users.find(u => (u.id === userId || u.username === userId));
+                if (user) {
+                    setSelectedUser(user);
+                    setShowUserDetailsModal(true);
+                }
+            };
+
+            const viewProductDetails = (product) => {
+                setSelectedProduct(product);
+                setShowProductDetailsModal(true);
+            };
+
+            const banUser = (userId) => {
+                // Find the user to ban
+                const userToBan = users.find(u => u.id === userId || u.username === userId);
+                if (userToBan) {
+                    setBanTargetUser(userToBan);
+                    setShowBanConfirmation(true);
+                }
+            };
+
+            const confirmBanUser = () => {
+                setShowBanConfirmation(false);
+                setShowBanPinModal(true);
+            };
+
+            const verifyBanPin = () => {
+                if (banPin === '9334') {
+                    // Load authoritative users list from storage
+                    const allUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                    const updatedUsers = allUsers.map(user =>
+                        (user.id === banTargetUser?.id || user.username === banTargetUser?.username)
+                            ? { ...user, status: 'Banned' }
+                            : user
+                    );
+                    // Persist and update state
+                    localStorage.setItem('jmpUsers', JSON.stringify(updatedUsers));
+                    setUsers(updatedUsers);
+
+                    // Delete all products by this user
+                    const allProducts = JSON.parse(localStorage.getItem('jmpProducts') || '[]');
+                    const updatedProducts = allProducts.filter(product => product.userEmail !== banTargetUser?.email);
+                    localStorage.setItem('jmpProducts', JSON.stringify(updatedProducts));
+                    setProducts(updatedProducts);
+
+                    // Send restriction message to user inbox
+                    const messages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                    messages.push({
+                        id: Date.now().toString() + Math.random(),
+                        recipientEmail: banTargetUser?.email,
+                        title: 'Account Restricted',
+                        content: 'Your account has been temporarily restricted. Contact Help & Support for details. You can still log in, but buying, posting, and other marketplace actions are disabled.',
+                        time: new Date().toLocaleString(),
+                        read: false
+                    });
+                    localStorage.setItem('jmpMessages', JSON.stringify(messages));
+
+                    // Close modals and reset ban state
+                    setShowBanPinModal(false);
+                    setShowUserDetailsModal(false);
+                    setBanPin('');
+                    setBanTargetUser(null);
+                    
+                    // Update selected user if viewing details
+                    if (selectedUser?.id === banTargetUser?.id || selectedUser?.username === banTargetUser?.username) {
+                        setSelectedUser(null);
+                    }
+
+                    alert('User has been banned and all their products have been deleted.');
+                } else {
+                    alert('Incorrect PIN. Ban cancelled.');
+                    setBanPin('');
+                }
+            };
+
+            const unbanUser = () => {
+                if (!selectedUser) return;
+                const allUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                const updatedUsers = allUsers.map(user =>
+                    (user.id === selectedUser.id || user.username === selectedUser.username)
+                        ? { ...user, status: 'Active' }
+                        : user
+                );
+                localStorage.setItem('jmpUsers', JSON.stringify(updatedUsers));
+                setUsers(updatedUsers);
+
+                const updatedSelected = { ...selectedUser, status: 'Active' };
+                setSelectedUser(updatedSelected);
+
+                const messages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                messages.push({
+                    id: Date.now().toString() + Math.random(),
+                    recipientEmail: selectedUser.email,
+                    title: 'Account Unbanned',
+                    content: 'Your account has been restored. You may now use the marketplace normally. If you need help, contact Help & Support.',
+                    time: new Date().toLocaleString(),
+                    read: false
+                });
+                localStorage.setItem('jmpMessages', JSON.stringify(messages));
+
+                alert('User has been unbanned.');
+            };
+
+            const cancelBan = () => {
+                setShowBanConfirmation(false);
+                setShowBanPinModal(false);
+                setBanPin('');
+                setBanTargetUser(null);
+            };
+
+            const getVerificationRequests = () => {
+                const stored = localStorage.getItem('jmpVerificationRequests');
+                return stored ? JSON.parse(stored) : [];
+            };
+
+            const getVerifiedUsers = () => {
+                const allUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                return allUsers.filter(u => u.verified === true);
+            };
+
+            const unverifyUser = (userEmail) => {
+                const allUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                const userIndex = allUsers.findIndex(u => u.email === userEmail);
+                if (userIndex !== -1) {
+                    allUsers[userIndex].verified = false;
+                    localStorage.setItem('jmpUsers', JSON.stringify(allUsers));
+                    
+                    // Send message to user
+                    const messages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                    const messageData = {
+                        id: Date.now().toString(),
+                        recipientEmail: userEmail,
+                        title: 'Verification Revoked',
+                        content: 'Your verification status has been revoked. You may reapply for verification if needed.',
+                        time: new Date().toLocaleString(),
+                        read: false
+                    };
+                    messages.push(messageData);
+                    localStorage.setItem('jmpMessages', JSON.stringify(messages));
+                    
+                    // Send notification
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('Verification Revoked', {
+                            body: 'Your verification status has been revoked. You may reapply for verification if needed.',
+                            icon: 'image/my-logo.png'
+                        });
+                    }
+                    
+                    alert('User verification has been revoked.');
+                    setUsers(getUsers()); // Refresh users
+                }
+            };
+
+            const getPendingSellerRequests = () => {
+                const allUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                return allUsers.filter(u => u.role === 'seller' && u.sellerStatus === 'pending_approval');
+            };
+
+            const approveSeller = (sellerEmail) => {
+                const allUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                const userIndex = allUsers.findIndex(u => u.email === sellerEmail);
+                if (userIndex !== -1) {
+                    allUsers[userIndex].sellerStatus = 'approved';
+                    localStorage.setItem('jmpUsers', JSON.stringify(allUsers));
+                    setUsers(allUsers);
+
+                    // Trigger admin notification for seller approval
+                    triggerAdminNotification('sellerRequest');
+
+                    // Send approval message
+                    const messages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                    messages.push({
+                        id: Date.now().toString() + Math.random(),
+                        recipientEmail: sellerEmail,
+                        title: 'Seller Account Approved',
+                        content: 'Congratulations! Your seller account has been approved. You can now post products on the marketplace.',
+                        time: new Date().toLocaleString(),
+                        read: false
+                    });
+                    localStorage.setItem('jmpMessages', JSON.stringify(messages));
+                    showNotification({
+                        title: 'Seller Approved',
+                        content: `Seller ${allUsers[userIndex].firstName} ${allUsers[userIndex].lastName} has been approved.`
+                    });
+                }
+            };
+
+            const rejectSeller = (sellerEmail) => {
+                const allUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                const userIndex = allUsers.findIndex(u => u.email === sellerEmail);
+                if (userIndex !== -1) {
+                    allUsers[userIndex].sellerStatus = 'rejected';
+                    localStorage.setItem('jmpUsers', JSON.stringify(allUsers));
+                    setUsers(allUsers);
+
+                    // Send rejection message
+                    const messages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                    messages.push({
+                        id: Date.now().toString() + Math.random(),
+                        recipientEmail: sellerEmail,
+                        title: 'Seller Request Rejected',
+                        content: 'Your seller request was rejected. Please contact support for more information.',
+                        time: new Date().toLocaleString(),
+                        read: false
+                    });
+                    localStorage.setItem('jmpMessages', JSON.stringify(messages));
+                    showNotification({
+                        title: 'Seller Rejected',
+                        content: `Seller ${allUsers[userIndex].firstName} ${allUsers[userIndex].lastName} has been rejected.`
+                    });
+                }
+            };
+
+            const approveVerification = (requestId) => {
+                const requests = getVerificationRequests();
+                const request = requests.find(r => r.id === requestId);
+                if (request) {
+                    // Update user as verified
+                    const users = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                    const userIndex = users.findIndex(u => u.email === request.userEmail);
+                    if (userIndex !== -1) {
+                        users[userIndex].verified = true;
+                        localStorage.setItem('jmpUsers', JSON.stringify(users));
+                    }
+
+                    // Send success message
+                    const messages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                    const messageData = {
+                        id: Date.now().toString(),
+                        recipientEmail: request.userEmail,
+                        title: 'Verification Approved',
+                        content: 'Your account has been successfully verified. You now have access to verified seller features.',
+                        time: new Date().toLocaleString(),
+                        read: false
+                    };
+                    messages.push(messageData);
+                    localStorage.setItem('jmpMessages', JSON.stringify(messages));
+
+                    // Send notification to user
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('Verification Approved', {
+                            body: 'Your account has been successfully verified. You now have access to verified seller features.',
+                            icon: 'image/my-logo.png',
+                            tag: 'verification-' + requestId
+                        });
+                    }
+
+                    // Remove request
+                    const updatedRequests = requests.filter(r => r.id !== requestId);
+                    localStorage.setItem('jmpVerificationRequests', JSON.stringify(updatedRequests));
+                    setUsers(getUsers()); // Refresh users
+                    alert('Verification approved. User has been notified.');
+                }
+            };
+
+            const rejectVerification = (requestId, reason) => {
+                if (!reason || !reason.trim()) {
+                    alert('Please provide a reason for rejection.');
+                    return;
+                }
+                const requests = getVerificationRequests();
+                const request = requests.find(r => r.id === requestId);
+                if (request) {
+                    // Send rejection message
+                    const messages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                    const messageData = {
+                        id: Date.now().toString(),
+                        recipientEmail: request.userEmail,
+                        title: 'Verification Rejected',
+                        content: `Your verification request was rejected: ${reason}. Please review and resubmit.`,
+                        time: new Date().toLocaleString(),
+                        read: false
+                    };
+                    messages.push(messageData);
+                    localStorage.setItem('jmpMessages', JSON.stringify(messages));
+
+                    // Send notification to user
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('Verification Rejected', {
+                            body: `Your verification request was rejected: ${reason}. Please review and resubmit.`,
+                            icon: 'image/my-logo.png',
+                            tag: 'verification-' + requestId
+                        });
+                    }
+
+                    // Remove request
+                    const updatedRequests = requests.filter(r => r.id !== requestId);
+                    localStorage.setItem('jmpVerificationRequests', JSON.stringify(updatedRequests));
+                    
+                    // Clear reason and close expanded view
+                    setVerificationRejectReasons(prev => ({ ...prev, [requestId]: '' }));
+                    setExpandedVerificationId(null);
+                    alert('Verification rejected. User has been notified.');
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-[#0b0b0b] text-white">
+                    {notificationPopup && (
+                        <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm rounded-3xl border border-[#D4AF37] bg-[#111111] p-4 shadow-2xl">
+                            <div className="flex items-start gap-3">
+                                <div className="text-[#D4AF37] text-2xl">🔔</div>
+                                <div className="flex-1">
+                                    <h4 className="text-lg font-semibold text-white">{notificationPopup.title}</h4>
+                                    <p className="text-gray-300 text-sm mt-1">{notificationPopup.content}</p>
+                                </div>
+                                <button onClick={() => setNotificationPopup(null)} className="text-gray-300 hover:text-white">✕</button>
+                            </div>
+                        </div>
+                    )}
+                    <header className="bg-[#111111] border-b border-[#D4AF37] px-6 py-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex flex-col items-center logo">
+                                <img src="image/my-logo.png" alt="Joshua Luxury Store Logo" />
+                                <div className="text-sm font-bold text-[#D4AF37]">Joshua Luxury Store</div>
+                            </div>
+                            <button
+                                onClick={() => { localStorage.removeItem('jmpAdminAccess'); window.location.href = './index.html'; }}
+                                className="bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="flex">
+                        <nav className="w-64 bg-[#111111] min-h-screen border-r border-[#D4AF37]">
+                            <div className="p-6">
+                                <h2 className="text-lg font-semibold text-[#D4AF37] mb-4">Management</h2>
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={() => setActiveSection('verification')}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700 font-bold text-lg ${activeSection === 'verification' ? 'ring-2 ring-green-300 ring-offset-2 ring-offset-[#111111]' : ''}`}
+                                    >
+                                        🔍 Verification Requests
+                                        {getVerificationRequests().length > 0 && (
+                                            <span className="ml-2 animate-pulse bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
+                                                {getVerificationRequests().length}
+                                            </span>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveSection('seller-approvals')}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-colors bg-purple-600 text-white hover:bg-purple-700 font-bold text-lg ${activeSection === 'seller-approvals' ? 'ring-2 ring-purple-300 ring-offset-2 ring-offset-[#111111]' : ''}`}
+                                    >
+                                        💼 Seller Approvals
+                                        {getPendingSellerRequests().length > 0 && (
+                                            <span className="ml-2 animate-pulse bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
+                                                {getPendingSellerRequests().length}
+                                            </span>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveSection('users')}
+                                        className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${activeSection === 'users' ? 'bg-[#D4AF37] text-black' : 'text-gray-300 hover:bg-gray-800'}`}
+                                    >
+                                        Users
+                                        {users.length > 0 && <span className="ml-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{users.length}</span>}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveSection('orders')}
+                                        className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${activeSection === 'orders' ? 'bg-[#D4AF37] text-black' : 'text-gray-300 hover:bg-gray-800'}`}
+                                    >
+                                        Orders
+                                        {orders.length > 0 && <span className="ml-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{orders.length}</span>}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveSection('products')}
+                                        className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${activeSection === 'products' ? 'bg-[#D4AF37] text-black' : 'text-gray-300 hover:bg-gray-800'}`}
+                                    >
+                                        Products
+                                        {products.filter(p => p.status === 'Pending').length > 0 && <span className="ml-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{products.filter(p => p.status === 'Pending').length}</span>}
+                                    </button>
+                                </div>
+                            </div>
+                        </nav>
+
+                        <main className="flex-1 p-6">
+                            {activeSection === 'users' && (
+                                <div>
+                                    <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Users</h2>
+                                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl overflow-hidden">
+                                                <div className="p-4 border-b border-[#D4AF37]/20">
+                                                    <input
+                                                        type="text"
+                                                        value={userSearch}
+                                                        onChange={(e) => setUserSearch(e.target.value)}
+                                                        placeholder="Search users by name, username or email..."
+                                                        className="w-full bg-[#0b0b0b] border border-[#333] text-gray-300 px-4 py-2 rounded-lg"
+                                                    />
+                                                </div>
+                                        <table className="w-full">
+                                            <thead className="bg-[#D4AF37] text-black">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left">First Name</th>
+                                                    <th className="px-6 py-3 text-left">Last Name</th>
+                                                    <th className="px-6 py-3 text-left">Username</th>
+                                                    <th className="px-6 py-3 text-left">Email</th>
+                                                    <th className="px-6 py-3 text-left">Phone</th>
+                                                    <th className="px-6 py-3 text-left">Joined</th>
+                                                    <th className="px-6 py-3 text-left">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {users
+                                                    .filter(user => {
+                                                        if (!userSearch) return true;
+                                                        const q = userSearch.toLowerCase();
+                                                        return ((user.firstName || user.name || '').toLowerCase().includes(q) ||
+                                                            (user.lastName || '').toLowerCase().includes(q) ||
+                                                            (user.username || '').toLowerCase().includes(q) ||
+                                                            (user.email || '').toLowerCase().includes(q));
+                                                    })
+                                                    .map(user => (
+                                                    <tr key={user.id || user.username} className="border-t border-gray-700">
+                                                        <td className="px-6 py-4">{user.firstName || user.name?.split(' ')[0]}</td>
+                                                        <td className="px-6 py-4">{user.lastName || user.name?.split(' ')[1]}</td>
+                                                        <td className="px-6 py-4">{user.username}</td>
+                                                        <td className="px-6 py-4">{user.email}</td>
+                                                        <td className="px-6 py-4">{user.phone}</td>
+                                                        <td className="px-6 py-4">{user.joined || new Date().toISOString().split('T')[0]}</td>
+                                                        <td className="px-6 py-4">
+                                                            <button
+                                                                onClick={() => viewUserDetails(user.id || user.username)}
+                                                                className="bg-[#D4AF37] text-black px-3 py-1 rounded text-sm hover:bg-opacity-80"
+                                                            >
+                                                                View Details
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeSection === 'products' && (
+                                <div>
+                                    <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Products</h2>
+                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl overflow-hidden">
+                                        <table className="w-full">
+                                            <thead className="bg-[#D4AF37] text-black">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left">Title</th>
+                                                    <th className="px-6 py-3 text-left">Category</th>
+                                                    <th className="px-6 py-3 text-left">Price</th>
+                                                    <th className="px-6 py-3 text-left">Status</th>
+                                                    <th className="px-6 py-3 text-left">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {products.map(product => (
+                                                    <tr key={product.id} className="border-t border-gray-700">
+                                                        <td className="px-6 py-4">{product.title}</td>
+                                                        <td className="px-6 py-4">{product.category}</td>
+                                                        <td className="px-6 py-4">{product.price}</td>
+                                                        <td className="px-6 py-4">{product.status}</td>
+                                                        <td className="px-6 py-4">
+                                                            {product.status === 'Pending' && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => updateProductStatus(product.id, 'Approved')}
+                                                                        className="bg-green-600 text-white px-3 py-1 rounded text-sm mr-2 hover:bg-green-700"
+                                                                    >
+                                                                        Approve
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => updateProductStatus(product.id, 'Rejected')}
+                                                                        className="bg-red-600 text-white px-3 py-1 rounded text-sm mr-2 hover:bg-red-700"
+                                                                    >
+                                                                        Reject
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button
+                                                                onClick={() => toggleProductPause(product.id)}
+                                                                className={`px-3 py-1 rounded text-sm mr-2 hover:opacity-80 ${product.paused ? 'bg-yellow-600 text-white' : 'bg-orange-600 text-white'}`}
+                                                            >
+                                                                {product.paused ? 'Unpause' : 'Pause'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => viewProductDetails(product)}
+                                                                className="text-[#D4AF37] px-3 py-1 rounded text-sm mr-2 hover:text-white hover:underline"
+                                                            >
+                                                                View Details
+                                                            </button>
+                                                            <button
+                                                                onClick={() => deleteProduct(product.id)}
+                                                                className="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeSection === 'orders' && (
+                                <div>
+                                    <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Orders</h2>
+                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl overflow-hidden">
+                                        <div className="p-4 border-b border-[#D4AF37]/20">
+                                            <input
+                                                type="text"
+                                                value={orderSearch}
+                                                onChange={(e) => setOrderSearch(e.target.value)}
+                                                placeholder="Search by Order ID, buyer, seller, or product..."
+                                                className="w-full bg-[#0b0b0b] border border-[#333] text-gray-300 px-4 py-2 rounded-lg"
+                                            />
+                                        </div>
+                                        <table className="w-full">
+                                            <thead className="bg-[#D4AF37] text-black">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left">Order ID</th>
+                                                    <th className="px-6 py-3 text-left">Product</th>
+                                                    <th className="px-6 py-3 text-left">Buyer</th>
+                                                    <th className="px-6 py-3 text-left">Seller</th>
+                                                    <th className="px-6 py-3 text-left">Price</th>
+                                                    <th className="px-6 py-3 text-left">Status</th>
+                                                    <th className="px-6 py-3 text-left">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {orders
+                                                    .filter((order) => {
+                                                        if (!orderSearch) return true;
+                                                        const query = orderSearch.toLowerCase();
+                                                        return (
+                                                            (`${order.id}` || '').toLowerCase().includes(query) ||
+                                                            (order.productTitle || '').toLowerCase().includes(query) ||
+                                                            (order.buyerName || '').toLowerCase().includes(query) ||
+                                                            (order.sellerName || '').toLowerCase().includes(query)
+                                                        );
+                                                    })
+                                                    .map((order) => (
+                                                    <tr key={order.id} className="border-t border-gray-700">
+                                                        <td className="px-6 py-4">
+                                                            <button
+                                                                onClick={() => setOrderSearch(order.id)}
+                                                                className="text-[#D4AF37] hover:underline"
+                                                            >
+                                                                {order.id}
+                                                            </button>
+                                                        </td>
+                                                        <td className="px-6 py-4">{order.productTitle}</td>
+                                                        <td className="px-6 py-4">{order.buyerName}</td>
+                                                        <td className="px-6 py-4">{order.sellerName}</td>
+                                                        <td className="px-6 py-4">₦{Math.round(parseInt(order.productPrice) * 1.1).toLocaleString('en-NG')}</td>
+                                                        <td className="px-6 py-4">
+                                                            <select
+                                                                value={order.status}
+                                                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                                                className="bg-gray-800 border border-[#D4AF37] rounded px-2 py-1 text-white"
+                                                            >
+                                                                <option value="Ordered">Ordered</option>
+                                                                <option value="Processing">Processing</option>
+                                                                <option value="Ready for Pickup">Ready for Pickup</option>
+                                                                <option value="Completed">Completed</option>
+                                                                <option value="Cancelled">Cancelled</option>
+                                                            </select>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <button onClick={() => viewOrderDetails(order)} className="text-[#D4AF37] hover:underline">View Details</button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeSection === 'verification' && (
+                                <div>
+                                    <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Verification Requests</h2>
+                                    
+                                    {/* Pending Requests */}
+                                    <div className="mb-8">
+                                        <h3 className="text-xl font-semibold text-[#D4AF37] mb-4">Pending Requests</h3>
+                                        <div className="space-y-4">
+                                            {getVerificationRequests().map(request => (
+                                                <div key={request.id} className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6">
+                                                    {expandedVerificationId !== request.id ? (
+                                                        // Collapsed View
+                                                        <div className="flex items-center justify-between gap-4">
+                                                            <div>
+                                                                <h3 className="text-xl font-semibold text-[#D4AF37]">{request.userName}</h3>
+                                                                <p className="text-gray-300 text-sm">{request.data.firstName} {request.data.lastName}</p>
+                                                                <p className="text-gray-400 text-sm">ID Type: {request.data.idType || 'Not specified'}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-600 text-white text-sm">
+                                                                    <span className="w-2 h-2 rounded-full bg-white" />
+                                                                    Pending
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => setExpandedVerificationId(request.id)}
+                                                                    className="bg-[#D4AF37] text-black px-6 py-2 rounded-lg hover:bg-opacity-80 font-semibold"
+                                                                >
+                                                                    View Details
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        // Expanded View
+                                                        <div className="flex flex-col gap-4">
+                                                            <div className="flex items-center justify-between gap-4">
+                                                                <div>
+                                                                    <h3 className="text-xl font-semibold text-[#D4AF37]">{request.userName}</h3>
+                                                                    <p className="text-gray-300">{request.userEmail}</p>
+                                                                    <p className="text-sm text-gray-400">Submitted: {new Date(request.submittedAt).toLocaleDateString()}</p>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => setExpandedVerificationId(null)}
+                                                                    className="text-gray-400 hover:text-white text-2xl"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Pictures Section */}
+                                                            <div>
+                                                                <h4 className="text-lg font-semibold text-[#D4AF37] mb-3">Uploaded Images</h4>
+                                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                                    {request.data.facePicture && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setSelectedImage(request.data.facePicture);
+                                                                                setShowImageModal(true);
+                                                                            }}
+                                                                            className="bg-[#0f0f0f] border border-[#D4AF37] rounded-3xl p-3 text-center focus:outline-none focus:ring-2 focus:ring-[#D4AF37] hover:opacity-80 transition-opacity"
+                                                                        >
+                                                                            <p className="text-sm text-gray-300 mb-2">Face Picture</p>
+                                                                            <img src={request.data.facePicture} alt="Face" className="mx-auto h-32 rounded-2xl object-cover" />
+                                                                        </button>
+                                                                    )}
+                                                                    {request.data.idPicture && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setSelectedImage(request.data.idPicture);
+                                                                                setShowImageModal(true);
+                                                                            }}
+                                                                            className="bg-[#0f0f0f] border border-[#D4AF37] rounded-3xl p-3 text-center focus:outline-none focus:ring-2 focus:ring-[#D4AF37] hover:opacity-80 transition-opacity"
+                                                                        >
+                                                                            <p className="text-sm text-gray-300 mb-2">ID Picture</p>
+                                                                            <img src={request.data.idPicture} alt="ID" className="mx-auto h-32 rounded-2xl object-cover" />
+                                                                        </button>
+                                                                    )}
+                                                                    {request.data.selfiePicture && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setSelectedImage(request.data.selfiePicture);
+                                                                                setShowImageModal(true);
+                                                                            }}
+                                                                            className="bg-[#0f0f0f] border border-[#D4AF37] rounded-3xl p-3 text-center focus:outline-none focus:ring-2 focus:ring-[#D4AF37] hover:opacity-80 transition-opacity"
+                                                                        >
+                                                                            <p className="text-sm text-gray-300 mb-2">Selfie</p>
+                                                                            <img src={request.data.selfiePicture} alt="Selfie" className="mx-auto h-32 rounded-2xl object-cover" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Complete Details Section */}
+                                                            <div>
+                                                                <h4 className="text-lg font-semibold text-[#D4AF37] mb-3">Verification Details</h4>
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-300 bg-[#0f0f0f] rounded-2xl p-6">
+                                                                    <div className="space-y-2">
+                                                                        <p><strong className="text-[#D4AF37]">Full Name:</strong> {request.data.firstName} {request.data.lastName}</p>
+                                                                        <p><strong className="text-[#D4AF37]">Phone:</strong> {request.data.phone}</p>
+                                                                        <p><strong className="text-[#D4AF37]">WhatsApp:</strong> {request.data.whatsapp}</p>
+                                                                        <p><strong className="text-[#D4AF37]">Email:</strong> {request.data.email}</p>
+                                                                        <p><strong className="text-[#D4AF37]">ID Type:</strong> {request.data.idType}</p>
+                                                                        {request.data.idType === 'National ID' && <p><strong className="text-[#D4AF37]">National ID:</strong> {request.data.nationalIdNumber}</p>}
+                                                                        {request.data.idType === "Driver's License" && <p><strong className="text-[#D4AF37]">License Number:</strong> {request.data.driversLicenseNumber}</p>}
+                                                                        {request.data.idType === 'International Passport' && <p><strong className="text-[#D4AF37]">Passport Number:</strong> {request.data.passportNumber}</p>}
+                                                                        {request.data.idType === "Voter's Card" && <p><strong className="text-[#D4AF37]">Voter's Card Number:</strong> {request.data.votersCardNumber}</p>}
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <p><strong className="text-[#D4AF37]">Bank Name:</strong> {request.data.bankName}</p>
+                                                                        <p><strong className="text-[#D4AF37]">Account Number:</strong> {request.data.accountNumber}</p>
+                                                                        <p><strong className="text-[#D4AF37]">Account Name:</strong> {request.data.accountName}</p>
+                                                                        <p><strong className="text-[#D4AF37]">Store Name:</strong> {request.data.storeName}</p>
+                                                                        <p><strong className="text-[#D4AF37]">Business Address:</strong> {request.data.businessAddress}</p>
+                                                                        <p><strong className="text-[#D4AF37]">Social Media:</strong> {request.data.socialMedia || 'N/A'}</p>
+                                                                        <p><strong className="text-[#D4AF37]">Business Description:</strong> {request.data.businessDescription || 'N/A'}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Approve Button */}
+                                                            <button
+                                                                onClick={() => approveVerification(request.id)}
+                                                                className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold w-full text-lg"
+                                                            >
+                                                                ✓ Approve Verification
+                                                            </button>
+
+                                                            {/* Reject Section */}
+                                                            <div className="bg-[#0f0f0f] border border-red-600 rounded-2xl p-4">
+                                                                <label className="text-gray-300 font-semibold mb-2 block">Rejection Reason:</label>
+                                                                <textarea
+                                                                    value={verificationRejectReasons[request.id] || ''}
+                                                                    onChange={(e) => setVerificationRejectReasons(prev => ({ ...prev, [request.id]: e.target.value }))}
+                                                                    placeholder="Enter reason for rejection..."
+                                                                    className="w-full bg-[#1a1a1a] border border-[#D4AF37] rounded-lg p-3 text-white placeholder-gray-500 mb-3"
+                                                                    rows="3"
+                                                                />
+                                                                <button
+                                                                    onClick={() => rejectVerification(request.id, verificationRejectReasons[request.id])}
+                                                                    className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 font-semibold w-full"
+                                                                >
+                                                                    Reject & Send Reason
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {getVerificationRequests().length === 0 && (
+                                                <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6 text-center">
+                                                    <p className="text-gray-300">No verification requests pending.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Verified Users */}
+                                    <div>
+                                        <h3 className="text-xl font-semibold text-[#D4AF37] mb-4">Verified Users</h3>
+                                        <div className="space-y-4">
+                                            {getVerifiedUsers().map(user => (
+                                                <div key={user.email} className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6">
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <div>
+                                                            <h3 className="text-xl font-semibold text-[#D4AF37]">{user.name}</h3>
+                                                            <p className="text-gray-300">{user.email}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-600 text-white text-sm">
+                                                                <span className="w-2 h-2 rounded-full bg-white" />
+                                                                Verified
+                                                            </span>
+                                                            <button
+                                                                onClick={() => unverifyUser(user.email)}
+                                                                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 font-semibold"
+                                                            >
+                                                                Unverify
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {getVerifiedUsers().length === 0 && (
+                                                <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6 text-center">
+                                                    <p className="text-gray-300">No verified users.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeSection === 'seller-approvals' && (
+                                <div>
+                                    <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Seller Approvals</h2>
+                                    {getPendingSellerRequests().length > 0 ? (
+                                        <div className="space-y-6">
+                                            {getPendingSellerRequests().map((seller) => (
+                                                <div key={seller.email} className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6">
+                                                    <div className="flex justify-between items-start gap-4 mb-6">
+                                                        <div className="flex-1">
+                                                            <h3 className="text-2xl font-bold text-[#D4AF37]">{seller.firstName} {seller.lastName}</h3>
+                                                            <p className="text-gray-400 text-sm">{seller.email}</p>
+                                                            <p className="text-gray-300 mt-2">Business WhatsApp: {seller.businessWhatsApp}</p>
+                                                        </div>
+                                                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-600 text-white font-semibold">
+                                                            ⏳ Pending
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <div className="bg-[#0f0f0f] rounded-2xl p-6 mb-6 text-gray-300 space-y-3">
+                                                        <div>
+                                                            <p><strong className="text-[#D4AF37]">Full Name:</strong> {seller.firstName} {seller.lastName}</p>
+                                                            <p><strong className="text-[#D4AF37]">Email:</strong> {seller.email}</p>
+                                                            <p><strong className="text-[#D4AF37]">Phone Number:</strong> {seller.phone}</p>
+                                                            <p><strong className="text-[#D4AF37]">Business WhatsApp:</strong> {seller.businessWhatsApp}</p>
+                                                            <p><strong className="text-[#D4AF37]">Business Address:</strong> {seller.businessAddress}</p>
+                                                            <p><strong className="text-[#D4AF37]">Signup Role:</strong> {seller.role === 'seller' ? 'Seller' : 'Buyer'}</p>
+                                                            <p><strong className="text-[#D4AF37]">Seller Status:</strong> {seller.sellerStatus}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex gap-3">
+                                                        <button
+                                                            onClick={() => approveSeller(seller.email)}
+                                                            className="flex-1 bg-green-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-green-700 transition-colors"
+                                                        >
+                                                            ✓ Approve Seller
+                                                        </button>
+                                                        <button
+                                                            onClick={() => rejectSeller(seller.email)}
+                                                            className="flex-1 bg-red-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-red-700 transition-colors"
+                                                        >
+                                                            ✕ Reject Seller
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-10 border border-dashed border-[#D4AF37] rounded-3xl">
+                                            <p className="text-gray-300 text-lg">No pending seller requests</p>
+                                            <p className="text-gray-400 text-sm">All seller requests have been processed</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                        </main>
+                    </div>
+
+                    {/* Image Modal */}
+                    {showImageModal && selectedImage && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                            <div className="relative max-w-4xl max-h-screen p-4">
+                                <button
+                                    onClick={() => setShowImageModal(false)}
+                                    className="absolute top-2 right-2 text-white text-3xl hover:text-gray-300 z-10"
+                                >
+                                    ✕
+                                </button>
+                                <img
+                                    src={selectedImage}
+                                    alt="Full size"
+                                    className="max-w-full max-h-full object-contain rounded-2xl"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {showOrderDetailsModal && selectedOrder && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div>
+                                        <h2 className="text-3xl font-bold text-[#D4AF37]">Order Details</h2>
+                                        <p className="text-gray-400 text-sm">Order ID: {selectedOrder.id}</p>
+                                    </div>
+                                    <button onClick={() => setShowOrderDetailsModal(false)} className="text-white text-3xl hover:text-gray-300">✕</button>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid gap-4 lg:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <p><strong className="text-[#D4AF37]">Buyer:</strong> {selectedOrder.buyerName || selectedOrder.user || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">Seller:</strong> {selectedOrder.sellerName || selectedOrder.user || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">Product:</strong> {selectedOrder.productTitle || selectedOrder.product || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">Price:</strong> {selectedOrder.productPrice ? `₦${Math.round(parseInt(selectedOrder.productPrice) * 1.1).toLocaleString('en-NG')}` : selectedOrder.amount || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">Status:</strong> {selectedOrder.status}</p>
+                                            <p><strong className="text-[#D4AF37]">Order Date:</strong> {selectedOrder.orderDate ? new Date(selectedOrder.orderDate).toLocaleDateString() : selectedOrder.date || 'N/A'}</p>
+                                        </div>
+                                        {(selectedOrder.productImage || selectedOrder.productImages?.[0] || selectedOrder.images?.[0]) ? (
+                                            <img
+                                                src={selectedOrder.productImage || selectedOrder.productImages?.[0] || selectedOrder.images?.[0]}
+                                                alt={selectedOrder.productTitle || 'Product Image'}
+                                                className="w-full h-72 object-cover rounded-3xl"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-72 bg-gray-900 rounded-3xl flex items-center justify-center text-gray-500">
+                                                No image available
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="bg-[#0f0f0f] p-4 rounded-3xl border border-[#333]">
+                                        <p className="text-gray-300"><strong className="text-[#D4AF37]">Order Summary:</strong></p>
+                                        <p className="text-gray-400 mt-2">{selectedOrder.productDescription || selectedOrder.description || 'No additional product description available.'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showProductDetailsModal && selectedProduct && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div>
+                                        <h2 className="text-3xl font-bold text-[#D4AF37]">Product Details</h2>
+                                        <p className="text-gray-400 text-sm">Product ID: {selectedProduct.id || 'N/A'}</p>
+                                    </div>
+                                    <button onClick={() => setShowProductDetailsModal(false)} className="text-white text-3xl hover:text-gray-300">✕</button>
+                                </div>
+                                <div className="grid gap-6 lg:grid-cols-2">
+                                    <div className="space-y-3">
+                                        <p><strong className="text-[#D4AF37]">Title:</strong> {selectedProduct.title || 'N/A'}</p>
+                                        <p><strong className="text-[#D4AF37]">Category:</strong> {selectedProduct.category || 'N/A'}</p>
+                                        <p><strong className="text-[#D4AF37]">Subcategory:</strong> {selectedProduct.subcategory || 'N/A'}</p>
+                                        <p><strong className="text-[#D4AF37]">Price:</strong> {selectedProduct.price ? `₦${parseFloat(selectedProduct.price).toLocaleString('en-NG')}` : 'N/A'}</p>
+                                        <p><strong className="text-[#D4AF37]">Status:</strong> {selectedProduct.status || 'N/A'}</p>
+                                        <p><strong className="text-[#D4AF37]">Seller Email:</strong> {selectedProduct.userEmail || selectedProduct.sellerEmail || 'N/A'}</p>
+                                        <p><strong className="text-[#D4AF37]">Posted On:</strong> {selectedProduct.postedAt ? new Date(selectedProduct.postedAt).toLocaleDateString() : 'N/A'}</p>
+                                        <div className="bg-[#0f0f0f] border border-[#333] rounded-3xl p-4">
+                                            <p className="text-[#D4AF37] font-semibold mb-2">Product Description</p>
+                                            <p className="text-gray-300">{selectedProduct.description || selectedProduct.details || 'No description available.'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {(selectedProduct.images?.length > 0 || selectedProduct.image || selectedProduct.productImage) ? (
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {(selectedProduct.images || [selectedProduct.image || selectedProduct.productImage]).map((src, index) => (
+                                                    src ? (
+                                                        <img key={index} src={src} alt={`${selectedProduct.title} ${index + 1}`} className="w-full h-60 object-cover rounded-3xl" />
+                                                    ) : null
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="w-full h-64 bg-gray-900 rounded-3xl flex items-center justify-center text-gray-500">
+                                                No product image available
+                                            </div>
+                                        )}
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {selectedProduct.condition && <p><strong className="text-[#D4AF37]">Condition:</strong> {selectedProduct.condition}</p>}
+                                            {selectedProduct.brand && <p><strong className="text-[#D4AF37]">Brand:</strong> {selectedProduct.brand}</p>}
+                                            {selectedProduct.location && <p><strong className="text-[#D4AF37]">Location:</strong> {selectedProduct.location}</p>}
+                                            {selectedProduct.stock && <p><strong className="text-[#D4AF37]">Stock:</strong> {selectedProduct.stock}</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Reject Product Modal */}
+                    {showRejectModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 w-full max-w-md">
+                                <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Reject Product</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">Reason for Rejection</label>
+                                        <textarea
+                                            value={rejectReason}
+                                            onChange={(e) => setRejectReason(e.target.value)}
+                                            placeholder="Please provide a detailed reason for rejecting this product..."
+                                            rows="4"
+                                            className="w-full px-3 py-2 bg-gray-800 border border-[#D4AF37] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div className="flex gap-3 mt-6">
+                                        <button
+                                            onClick={handleRejectSubmit}
+                                            className="flex-1 bg-red-600 text-white py-2 rounded-full font-semibold hover:bg-red-700"
+                                        >
+                                            Reject Product
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowRejectModal(false); setRejectReason(''); setRejectingProductId(null); }}
+                                            className="flex-1 border border-[#D4AF37] text-[#D4AF37] py-2 rounded-full font-semibold hover:bg-[#D4AF37] hover:text-black"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* User Details Modal */}
+                    {showUserDetailsModal && selectedUser && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                                <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">User Details</h2>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <p><strong className="text-[#D4AF37]">First Name:</strong> {selectedUser.firstName || selectedUser.name?.split(' ')[0]}</p>
+                                            <p><strong className="text-[#D4AF37]">Last Name:</strong> {selectedUser.lastName || selectedUser.name?.split(' ')[1]}</p>
+                                            <p><strong className="text-[#D4AF37]">Username:</strong> {selectedUser.username}</p>
+                                            <p><strong className="text-[#D4AF37]">Email:</strong> {selectedUser.email}</p>
+                                            <p><strong className="text-[#D4AF37]">Phone:</strong> {selectedUser.phone || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">Status:</strong> {selectedUser.status || 'Active'}</p>
+                                            <p><strong className="text-[#D4AF37]">Joined:</strong> {selectedUser.joined || new Date().toISOString().split('T')[0]}</p>
+                                            <p><strong className="text-[#D4AF37]">Verified:</strong> {selectedUser.verified ? 'Yes' : 'No'}</p>
+                                        </div>
+                                        <div>
+                                            {(() => {
+                                                const userProducts = products.filter(p => p.userEmail === selectedUser.email);
+                                                const hasProducts = userProducts.length > 0;
+                                                return (
+                                                    <div>
+                                                        <p><strong className="text-[#D4AF37]">Products Posted:</strong> {userProducts.length}</p>
+                                                        {hasProducts && (
+                                                            <div className="mt-4">
+                                                                <p><strong className="text-[#D4AF37]">Password:</strong> {selectedUser.password || 'Not Available'}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3 mt-6">
+                                        {selectedUser.status !== 'Banned' ? (
+                                            <button
+                                                onClick={() => banUser(selectedUser.id || selectedUser.username)}
+                                                className="flex-1 bg-red-600 text-white py-2 rounded-full font-semibold hover:bg-red-700"
+                                            >
+                                                🚫 Ban Account
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={unbanUser}
+                                                className="flex-1 bg-green-600 text-white py-2 rounded-full font-semibold hover:bg-green-700"
+                                            >
+                                                ✅ Unban Account
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => { setShowUserDetailsModal(false); setSelectedUser(null); }}
+                                            className="flex-1 border border-[#D4AF37] text-[#D4AF37] py-2 rounded-full font-semibold hover:bg-[#D4AF37] hover:text-black"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Ban Confirmation Modal */}
+                    {showBanConfirmation && banTargetUser && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 w-full max-w-md">
+                                <h2 className="text-3xl font-bold text-red-500 mb-6">⚠️ Confirm Ban</h2>
+                                <p className="text-gray-300 mb-6">
+                                    Are you sure you want to ban <strong>{banTargetUser.firstName || banTargetUser.name} {banTargetUser.lastName || ''}</strong>?
+                                    <br /><br />
+                                    This will:
+                                    <br />• Ban the user account
+                                    <br />• Delete all products posted by this user
+                                    <br />• This action cannot be undone
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={confirmBanUser}
+                                        className="flex-1 bg-red-600 text-white py-2 rounded-full font-semibold hover:bg-red-700"
+                                    >
+                                        Yes, Ban Account
+                                    </button>
+                                    <button
+                                        onClick={cancelBan}
+                                        className="flex-1 border border-[#D4AF37] text-[#D4AF37] py-2 rounded-full font-semibold hover:bg-[#D4AF37] hover:text-black"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Ban PIN Verification Modal */}
+                    {showBanPinModal && banTargetUser && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 w-full max-w-md">
+                                <h2 className="text-3xl font-bold text-red-500 mb-6">🔐 Enter Admin PIN</h2>
+                                <p className="text-gray-300 mb-6">
+                                    Enter the 4-digit admin PIN to confirm banning <strong>{banTargetUser.firstName || banTargetUser.name} {banTargetUser.lastName || ''}</strong>.
+                                </p>
+                                <div className="space-y-4">
+                                    <input
+                                        type="password"
+                                        value={banPin}
+                                        onChange={(e) => setBanPin(e.target.value)}
+                                        placeholder="Enter 4-digit PIN"
+                                        maxLength="4"
+                                        className="w-full px-3 py-2 bg-gray-800 border border-[#D4AF37] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent text-center text-2xl"
+                                    />
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={verifyBanPin}
+                                            className="flex-1 bg-red-600 text-white py-2 rounded-full font-semibold hover:bg-red-700"
+                                            disabled={banPin.length !== 4}
+                                        >
+                                            Confirm Ban
+                                        </button>
+                                        <button
+                                            onClick={cancelBan}
+                                            className="flex-1 border border-[#D4AF37] text-[#D4AF37] py-2 rounded-full font-semibold hover:bg-[#D4AF37] hover:text-black"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            );
+        };
+
+        const Footer = () => (
+            <footer className="py-8 px-4 border-t border-[#D4AF37] border-opacity-20 bg-[#0b0b0b]">
+                <div className="max-w-6xl mx-auto text-center">
+                    <h3 className="text-2xl font-bold text-[#D4AF37] mb-4">Help & Support</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+                        <div>
+                            <h4 className="text-lg font-semibold text-white mb-2">Instagram</h4>
+                            <a
+                                href="https://www.instagram.com/joshua_luxury_store?igsh=MWVnODBjb2FoYmd1eA=="
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                            >
+                                Follow on Instagram
+                            </a>
+                        </div>
+                        <div>
+                            <h4 className="text-lg font-semibold text-white mb-2">TikTok</h4>
+                            <a
+                                href="https://www.tiktok.com/@joshua_luxury_store?_r=1&_t=ZS-96FtF8a6NHz"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                            >
+                                Follow on TikTok
+                            </a>
+                        </div>
+                        <div>
+                            <h4 className="text-lg font-semibold text-white mb-2">WhatsApp</h4>
+                            <a
+                                href="https://wa.me/09124378138"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                            >
+                                Contact via WhatsApp
+                            </a>
+                        </div>
+                        <div>
+                            <h4 className="text-lg font-semibold text-white mb-2">Email</h4>
+                            <a
+                                href="mailto:oluwapelumif0@gmail.com"
+                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                            >
+                                Send Email
+                            </a>
+                        </div>
+                        <div>
+                            <h4 className="text-lg font-semibold text-white mb-2">Urgent</h4>
+                            <a
+                                href="tel:09151888340"
+                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                            >
+                                Call Now
+                            </a>
+                        </div>
+                    </div>
+                    <p className="text-gray-300">Support available during working days, response within 24 hours.</p>
+                </div>
+            </footer>
+        );
+
+        const App = () => (
+            <HashRouter>
+                <div className="min-h-screen flex flex-col">
+                    <div className="flex-grow">
+                        <Routes>
+                            <Route path="/" element={<AdminDashboard />} />
+                        </Routes>
+                    </div>
+                    <Footer />
+                </div>
+            </HashRouter>
+        );
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
+
+
+
+

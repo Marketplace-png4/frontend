@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Joshua Luxury Store</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: serif; }
+        .logo img {
+            width: 90px;
+            height: 90px;
+            object-fit: contain;
+            object-position: center;
+            display: block;
+            background: transparent;
+            border-radius: 50%;
+            padding: 4px;
+        }
+        @media (max-width: 768px) {
+            .logo img { width: 65px; height: 65px; }
+        }
+        body.theme-light .text-white { color: #000 !important; }
+        body.theme-light .text-gray-300 { color: #222 !important; }
+        body.theme-light .text-gray-400 { color: #333 !important; }
+        body.theme-light .bg-gray-800,
+        body.theme-light .bg-gray-900,
+        body.theme-light .bg-\[\#0b0b0b\],
+        body.theme-light .bg-\[\#111111\],
+        body.theme-light .bg-\[\#222222\],
+        body.theme-light .bg-\[\#222\] {
+            background-color: #f8f8f8 !important;
+            color: #000 !important;
+        }
+        body.theme-light .border-\[\#D4AF37\] { border-color: #D4AF37 !important; }
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-tertiary: #eeeeee;
+            --text-primary: #000000;
+            --text-secondary: #666666;
+            --border-color: #D4AF37;
+        }
+        [data-theme="dark"] {
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #111111;
+            --bg-tertiary: #222222;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --border-color: #D4AF37;
+        }
+    </style>
+</head>
+<body class="bg-[#0b0b0b] text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Biometric detection helper
+        const detectBiometricCapability = async () => {
+            if (!window.isSecureContext) return false;
+            if (!navigator.credentials) return false;
+            try {
+                const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+                return available;
+            } catch (e) {
+                return false;
+            }
+        };
+
+        // Currency list with exchange rates (relative to NGN)
+        const currencies = [
+            { code: 'NGN', symbol: '₦', name: 'Nigerian Naira', rate: 1 },
+            { code: 'USD', symbol: '$', name: 'US Dollar', rate: 0.0012 },
+            { code: 'EUR', symbol: '€', name: 'Euro', rate: 0.0011 },
+            { code: 'GBP', symbol: '£', name: 'British Pound', rate: 0.00095 },
+            { code: 'JPY', symbol: '¥', name: 'Japanese Yen', rate: 0.18 },
+            { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', rate: 0.0017 },
+            { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', rate: 0.0018 },
+            { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc', rate: 0.001 },
+            { code: 'INR', symbol: '₹', name: 'Indian Rupee', rate: 0.1 },
+            { code: 'ZAR', symbol: 'R', name: 'South African Rand', rate: 0.022 },
+        ];
+
+        // Currency conversion function
+        const convertCurrency = (amountInNGN, fromCurrency = 'NGN', toCurrency = 'NGN') => {
+            if (fromCurrency === toCurrency) return amountInNGN;
+            const fromRate = currencies.find(c => c.code === fromCurrency)?.rate || 1;
+            const toRate = currencies.find(c => c.code === toCurrency)?.rate || 1;
+            return (amountInNGN * toRate) / fromRate;
+        };
+
+        // Language list
+        const languages = [
+            { code: 'en', name: 'English' },
+            { code: 'es', name: 'Español' },
+            { code: 'fr', name: 'Français' },
+            { code: 'de', name: 'Deutsch' },
+            { code: 'pt', name: 'Português' },
+            { code: 'ja', name: '日本語' },
+            { code: 'zh', name: '中文' },
+            { code: 'ar', name: 'العربية' },
+        ];
+
+        const soundNotifications = [
+            { id: 'sound1', name: 'Bell' },
+            { id: 'sound2', name: 'Chime' },
+            { id: 'sound3', name: 'Alert' },
+        ];
+
+        // Sound utility functions for notifications
+        const playNotificationSound = (soundId) => {
+            try {
+                // Create audio context for sound playback
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                // Different sound patterns based on selection
+                if (soundId === 'sound1') {
+                    // Bell sound (higher pitch)
+                    oscillator.frequency.value = 800;
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                } else if (soundId === 'sound2') {
+                    // Chime sound (two tones)
+                    oscillator.frequency.value = 600;
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                    
+                    const oscillator2 = audioContext.createOscillator();
+                    oscillator2.connect(gainNode);
+                    oscillator2.frequency.value = 900;
+                    oscillator2.start(audioContext.currentTime + 0.35);
+                    oscillator2.stop(audioContext.currentTime + 0.65);
+                } else if (soundId === 'sound3') {
+                    // Alert sound (beeping)
+                    oscillator.frequency.value = 1000;
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.2);
+                }
+            } catch (e) {
+                console.log('Sound playback not supported:', e);
+            }
+        };
+
+        // Text-to-speech for admin notifications
+        const speakNotification = (message) => {
+            try {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(message);
+                    utterance.rate = 1;
+                    utterance.pitch = 1;
+                    utterance.volume = 1;
+                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.speak(utterance);
+                }
+            } catch (e) {
+                console.log('Speech synthesis not supported:', e);
+            }
+        };
+
+        // Trigger notification with sound/speech
+        const triggerNotification = (type, isAdmin = false, userSettings = null) => {
+            if (isAdmin) {
+                // Admin notifications with text-to-speech
+                const messages = {
+                    newUser: 'new user just signed up',
+                    productApproval: 'A product for approval is waiting for you',
+                    newOrder: 'New order has been placed in your marketplace go check it now',
+                    verification: 'A verification request is here be careful and go check it',
+                    sellerRequest: 'A new worker want to join your team approve the seller product',
+                };
+                speakNotification(messages[type] || 'New notification');
+            } else if (userSettings && userSettings.sound && userSettings.selectedSound) {
+                // Regular user notifications with sound
+                playNotificationSound(userSettings.selectedSound);
+            }
+        };
+
+        const SettingsPage = () => {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [editableUser, setEditableUser] = useState({});
+            const [isEditingAccount, setIsEditingAccount] = useState(false);
+            const [activeTab, setActiveTab] = useState('account');
+            const [loading, setLoading] = useState(true);
+            const [successMessage, setSuccessMessage] = useState('');
+            const [errorMessage, setErrorMessage] = useState('');
+            
+            // Theme
+            const [theme, setTheme] = useState('dark');
+            const [themeMode, setThemeMode] = useState('dark'); // dark, light, device
+            
+            // Language & Currency
+            const [language, setLanguage] = useState('en');
+            const [currency, setCurrency] = useState('NGN');
+            
+            // Notifications
+            const [notifications, setNotifications] = useState({
+                inbox: true,
+                orders: true,
+                verification: true,
+                promotional: false,
+                sound: true,
+                selectedSound: 'sound1',
+            });
+
+            // Security
+            const [passwordData, setPasswordData] = useState({
+                oldPassword: '',
+                newPassword: '',
+                confirmPassword: '',
+            });
+            const [biometricEnabled, setBiometricEnabled] = useState(false);
+            const [biometricAvailable, setBiometricAvailable] = useState(false);
+
+            // Store Settings (for sellers)
+            const [storeData, setStoreData] = useState({
+                storeName: '',
+                businessDescription: '',
+                shipping: '',
+                returnPolicy: '',
+                storeVisible: true,
+            });
+
+            // Transaction History
+            const [transactions, setTransactions] = useState([]);
+
+            useEffect(() => {
+                const user = localStorage.getItem('jmpCurrentUser');
+                if (user) {
+                    const userData = JSON.parse(user);
+                    setCurrentUser(userData);
+                    setEditableUser(userData);
+                    loadSettings(userData.email, userData);
+                    loadTransactionHistory(userData.email);
+                    setLoading(false);
+                } else {
+                    // Redirect to login page without showing loading screen
+                    setTimeout(() => {
+                        window.location.href = './index.html#/login';
+                    }, 100);
+                }
+            }, []);
+
+            useEffect(() => {
+                detectBiometricCapability().then(available => {
+                    setBiometricAvailable(available);
+                    if (available && currentUser) {
+                        const bioEnabled = localStorage.getItem(`jmpBiometric_${currentUser.email}`);
+                        setBiometricEnabled(!!bioEnabled);
+                    }
+                });
+            }, [currentUser]);
+
+            // Apply theme based on themeMode (dark/light/device)
+            useEffect(() => {
+                const applyTheme = () => {
+                    let mode = themeMode;
+                    if (mode === 'device') {
+                        try {
+                            mode = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+                        } catch (e) {
+                            mode = 'dark';
+                        }
+                    }
+                    document.documentElement.setAttribute('data-theme', mode);
+                    document.body.classList.toggle('theme-light', mode === 'light');
+                    document.body.classList.toggle('theme-dark', mode === 'dark');
+                    if (mode === 'light') {
+                        document.body.style.background = getComputedStyle(document.documentElement).getPropertyValue('--bg-primary') || '#ffffff';
+                        document.body.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text-primary') || '#000000';
+                    } else {
+                        document.body.style.background = getComputedStyle(document.documentElement).getPropertyValue('--bg-primary') || '#0b0b0b';
+                        document.body.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text-primary') || '#ffffff';
+                    }
+                };
+
+                applyTheme();
+
+                const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)');
+                const handler = () => { if (themeMode === 'device') applyTheme(); };
+                if (mq && mq.addEventListener) mq.addEventListener('change', handler);
+                else if (mq && mq.addListener) mq.addListener(handler);
+                return () => {
+                    if (mq && mq.removeEventListener) mq.removeEventListener('change', handler);
+                    else if (mq && mq.removeListener) mq.removeListener(handler);
+                };
+            }, [themeMode]);
+
+            const loadSettings = (email, userData) => {
+                try {
+                    const settings = JSON.parse(localStorage.getItem(`jmpSettings_${email}`) || '{}');
+                    setThemeMode(settings.themeMode || 'dark');
+                    setLanguage(settings.language || 'en');
+                    setCurrency(settings.currency || 'NGN');
+                    setNotifications(prev => ({ ...prev, ...settings.notifications }));
+                    
+                    if (userData?.accountType === 'seller') {
+                        setStoreData({
+                            storeName: userData.storeName || '',
+                            businessDescription: userData.businessDescription || '',
+                            shipping: settings.shipping || '',
+                            returnPolicy: settings.returnPolicy || '',
+                            storeVisible: settings.storeVisible !== false,
+                        });
+                    }
+                } catch (e) {
+                    console.error('Error loading settings:', e);
+                }
+            };
+
+            const loadTransactionHistory = (email) => {
+                try {
+                    const orders = JSON.parse(localStorage.getItem('jmpOrders') || '[]');
+                    const userTransactions = orders.filter(o => o.buyerEmail === email || o.sellerEmail === email);
+                    setTransactions(userTransactions);
+                } catch (e) {
+                    console.error('Error loading transactions:', e);
+                    setTransactions([]);
+                }
+            };
+
+            const saveSettings = () => {
+                const settings = {
+                    themeMode,
+                    language,
+                    currency,
+                    notifications,
+                    shipping: storeData.shipping,
+                    returnPolicy: storeData.returnPolicy,
+                    storeVisible: storeData.storeVisible,
+                    lastUpdated: new Date().toISOString(),
+                };
+                localStorage.setItem(`jmpSettings_${currentUser.email}`, JSON.stringify(settings));
+                
+                // Dispatch settings events for other pages to listen
+                window.dispatchEvent(new CustomEvent('currencyChanged', { detail: { currency } }));
+                window.dispatchEvent(new CustomEvent('themeModeChanged', { detail: { themeMode } }));
+                
+                setSuccessMessage('Settings saved successfully!');
+                setTimeout(() => setSuccessMessage(''), 3000);
+            };
+
+            const saveAccountChanges = () => {
+                try {
+                    const users = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                    const userIndex = users.findIndex(u => u.email === currentUser.email);
+                    if (userIndex !== -1) {
+                        users[userIndex] = { ...users[userIndex], ...editableUser };
+                        localStorage.setItem('jmpUsers', JSON.stringify(users));
+                    }
+                    
+                    localStorage.setItem('jmpCurrentUser', JSON.stringify(editableUser));
+                    setCurrentUser(editableUser);
+                    setIsEditingAccount(false);
+                    
+                    // Notify other tabs or admin pages that user data changed
+                    window.dispatchEvent(new CustomEvent('userUpdated', { detail: { email: editableUser.email } }));
+                    
+                    setSuccessMessage('Account information updated successfully!');
+                    setTimeout(() => setSuccessMessage(''), 3000);
+                } catch (e) {
+                    setErrorMessage('Failed to save account changes');
+                    console.error('Error saving account:', e);
+                }
+            };
+
+            const handleChangePassword = () => {
+                if (!passwordData.oldPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+                    setErrorMessage('All password fields are required');
+                    return;
+                }
+                if (passwordData.newPassword !== passwordData.confirmPassword) {
+                    setErrorMessage('New passwords do not match');
+                    return;
+                }
+                if (passwordData.newPassword.length < 6) {
+                    setErrorMessage('Password must be at least 6 characters');
+                    return;
+                }
+                if (passwordData.oldPassword !== currentUser.password) {
+                    setErrorMessage('Incorrect old password');
+                    return;
+                }
+
+                // Update password
+                const users = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                const userIndex = users.findIndex(u => u.email === currentUser.email);
+                if (userIndex !== -1) {
+                    users[userIndex].password = passwordData.newPassword;
+                    localStorage.setItem('jmpUsers', JSON.stringify(users));
+                    
+                    // Update current user
+                    const updatedUser = { ...currentUser, password: passwordData.newPassword };
+                    localStorage.setItem('jmpCurrentUser', JSON.stringify(updatedUser));
+                    
+                    setSuccessMessage('Password changed successfully! Logging out...');
+                    setTimeout(() => {
+                        localStorage.removeItem('jmpCurrentUser');
+                        window.location.href = './index.html#/login';
+                    }, 2000);
+                }
+            };
+
+            const handleBiometricSetup = async () => {
+                if (!biometricAvailable) {
+                    setErrorMessage('Biometric authentication is not available on this device');
+                    return;
+                }
+
+                try {
+                    // Simulate biometric confirmation (in production, use WebAuthn API)
+                    const confirmed = window.confirm('Please confirm with your fingerprint or face. (Simulated for demo)');
+                    if (confirmed) {
+                        localStorage.setItem(`jmpBiometric_${currentUser.email}`, 'enabled');
+                        setBiometricEnabled(true);
+                        setSuccessMessage('Biometric authentication enabled!');
+                        setTimeout(() => setSuccessMessage(''), 3000);
+                    }
+                } catch (error) {
+                    setErrorMessage('Biometric setup failed: ' + error.message);
+                }
+            };
+
+            const handleDisableBiometric = () => {
+                localStorage.removeItem(`jmpBiometric_${currentUser.email}`);
+                setBiometricEnabled(false);
+                setSuccessMessage('Biometric authentication disabled');
+                setTimeout(() => setSuccessMessage(''), 3000);
+            };
+
+            const handleDeleteAccount = () => {
+                if (window.confirm('Are you sure you want to permanently delete your account? This cannot be undone.')) {
+                    if (window.confirm('This will delete all your data. Are you really sure?')) {
+                        const users = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                        const updatedUsers = users.filter(u => u.email !== currentUser.email);
+                        localStorage.setItem('jmpUsers', JSON.stringify(updatedUsers));
+                        localStorage.removeItem('jmpCurrentUser');
+                        localStorage.removeItem(`jmpSettings_${currentUser.email}`);
+                        window.location.href = './index.html';
+                    }
+                }
+            };
+
+            const handleLogoutAllDevices = () => {
+                // Clear all device tokens/sessions
+                localStorage.removeItem('jmpCurrentUser');
+                setSuccessMessage('Logged out from all devices. Redirecting to login...');
+                setTimeout(() => {
+                    window.location.href = './index.html#/login';
+                }, 1500);
+            };
+
+            if (loading) return (
+                <div className="min-h-screen bg-[#0b0b0b] text-white flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#D4AF37] border-opacity-30 border-t-[#D4AF37]"></div>
+                        <p className="text-gray-400">Loading settings...</p>
+                    </div>
+                </div>
+            );
+            if (!currentUser) return (
+                <div className="min-h-screen bg-[#0b0b0b] text-white flex items-center justify-center">
+                    <div className="text-center">
+                        <p className="text-gray-400 mb-4">Redirecting to login...</p>
+                    </div>
+                </div>
+            );
+
+            const currencyDisplay = currencies.find(c => c.code === currency);
+
+            return (
+                <div className="min-h-screen bg-[#0b0b0b] text-white">
+                    {/* Header */}
+                    <header className="bg-[#111111] border-b border-[#D4AF37] px-6 py-4">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="flex flex-col items-center logo">
+                                    <img src="image/my-logo.png" alt="Joshua Luxury Store Logo" />
+                                    <div className="text-sm font-bold text-[#D4AF37]">Joshua Luxury Store</div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => window.location.href = './Marketplace.html'}
+                                    className="border border-[#D4AF37] text-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37] hover:text-black transition-colors"
+                                >
+                                    Back to Marketplace
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        localStorage.removeItem('jmpCurrentUser');
+                                        window.location.href = './index.html#/login';
+                                    }}
+                                    className="border border-red-600 text-red-600 px-4 py-2 rounded-full hover:bg-red-600 hover:text-white transition-colors"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Messages */}
+                    {successMessage && (
+                        <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+                            {successMessage}
+                        </div>
+                    )}
+                    {errorMessage && (
+                        <div className="fixed top-4 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+                            {errorMessage}
+                        </div>
+                    )}
+
+                    <div className="max-w-7xl mx-auto px-6 py-10">
+                        <h1 className="text-4xl font-bold text-[#D4AF37] mb-10">Settings</h1>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            {/* Sidebar Navigation */}
+                            <div className="md:col-span-1">
+                                <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-6 space-y-2">
+                                    <button
+                                        onClick={() => setActiveTab('account')}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${activeTab === 'account' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-[#222]'}`}
+                                    >
+                                        Account
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('appSettings')}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${activeTab === 'appSettings' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-[#222]'}`}
+                                    >
+                                        App Settings
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('security')}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${activeTab === 'security' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-[#222]'}`}
+                                    >
+                                        Security
+                                    </button>
+                                    {currentUser.accountType === 'seller' && (
+                                        <button
+                                            onClick={() => setActiveTab('store')}
+                                            className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${activeTab === 'store' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-[#222]'}`}
+                                        >
+                                            Store Settings
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setActiveTab('transactions')}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${activeTab === 'transactions' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-[#222]'}`}
+                                    >
+                                        Transaction History
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('terms')}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${activeTab === 'terms' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-[#222]'}`}
+                                    >
+                                        Terms & Privacy
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Main Content */}
+                            <div className="md:col-span-3">
+                                {/* Account Settings */}
+                                {activeTab === 'account' && (
+                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8 space-y-6">
+                                        <div className="flex justify-between items-center">
+                                            <h2 className="text-2xl font-bold text-[#D4AF37]">Account Information</h2>
+                                            <div className="flex gap-3">
+                                                {!isEditingAccount ? (
+                                                    <button
+                                                        onClick={() => setIsEditingAccount(true)}
+                                                        className="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors text-sm font-semibold"
+                                                    >
+                                                        Edit Account
+                                                    </button>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={saveAccountChanges}
+                                                            className="bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 transition-colors text-sm font-semibold"
+                                                        >
+                                                            Save Changes
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditableUser(currentUser);
+                                                                setIsEditingAccount(false);
+                                                            }}
+                                                            className="bg-gray-600 text-white px-4 py-2 rounded-full hover:bg-gray-700 transition-colors text-sm font-semibold"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        localStorage.removeItem('jmpCurrentUser');
+                                                        window.location.href = './index.html#/login';
+                                                    }}
+                                                    className="bg-red-600 text-white px-4 py-2 rounded-full hover:bg-red-700 transition-colors text-sm font-semibold"
+                                                >
+                                                    Logout
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">First Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={editableUser.firstName || ''}
+                                                    onChange={(e) => isEditingAccount && setEditableUser({ ...editableUser, firstName: e.target.value })}
+                                                    disabled={!isEditingAccount}
+                                                    className={`w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg ${isEditingAccount ? 'opacity-100 cursor-text' : 'opacity-60'}`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">Last Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={editableUser.lastName || ''}
+                                                    onChange={(e) => isEditingAccount && setEditableUser({ ...editableUser, lastName: e.target.value })}
+                                                    disabled={!isEditingAccount}
+                                                    className={`w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg ${isEditingAccount ? 'opacity-100 cursor-text' : 'opacity-60'}`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">Email</label>
+                                                <input
+                                                    type="email"
+                                                    value={editableUser.email || ''}
+                                                    disabled
+                                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg opacity-60"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">Account Type</label>
+                                                <input
+                                                    type="text"
+                                                    value={(editableUser.accountType?.charAt(0).toUpperCase() + editableUser.accountType?.slice(1)) || 'N/A'}
+                                                    disabled
+                                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg opacity-60"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">Phone Number</label>
+                                                <input
+                                                    type="tel"
+                                                    value={editableUser.phone || ''}
+                                                    onChange={(e) => isEditingAccount && setEditableUser({ ...editableUser, phone: e.target.value })}
+                                                    disabled={!isEditingAccount}
+                                                    className={`w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg ${isEditingAccount ? 'opacity-100 cursor-text' : 'opacity-60'}`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">WhatsApp Number</label>
+                                                <input
+                                                    type="tel"
+                                                    value={editableUser.whatsapp || ''}
+                                                    onChange={(e) => isEditingAccount && setEditableUser({ ...editableUser, whatsapp: e.target.value })}
+                                                    disabled={!isEditingAccount}
+                                                    className={`w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg ${isEditingAccount ? 'opacity-100 cursor-text' : 'opacity-60'}`}
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">Street Address</label>
+                                                <input
+                                                    type="text"
+                                                    value={editableUser.streetAddress || ''}
+                                                    onChange={(e) => isEditingAccount && setEditableUser({ ...editableUser, streetAddress: e.target.value })}
+                                                    disabled={!isEditingAccount}
+                                                    className={`w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg ${isEditingAccount ? 'opacity-100 cursor-text' : 'opacity-60'}`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">City</label>
+                                                <input
+                                                    type="text"
+                                                    value={editableUser.city || ''}
+                                                    onChange={(e) => isEditingAccount && setEditableUser({ ...editableUser, city: e.target.value })}
+                                                    disabled={!isEditingAccount}
+                                                    className={`w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg ${isEditingAccount ? 'opacity-100 cursor-text' : 'opacity-60'}`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">State</label>
+                                                <input
+                                                    type="text"
+                                                    value={editableUser.state || ''}
+                                                    onChange={(e) => isEditingAccount && setEditableUser({ ...editableUser, state: e.target.value })}
+                                                    disabled={!isEditingAccount}
+                                                    className={`w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg ${isEditingAccount ? 'opacity-100 cursor-text' : 'opacity-60'}`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-300 text-sm font-semibold mb-2">Country</label>
+                                                <input
+                                                    type="text"
+                                                    value={editableUser.country || ''}
+                                                    onChange={(e) => isEditingAccount && setEditableUser({ ...editableUser, country: e.target.value })}
+                                                    disabled={!isEditingAccount}
+                                                    className={`w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg ${isEditingAccount ? 'opacity-100 cursor-text' : 'opacity-60'}`}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* App Settings */}
+                                {activeTab === 'appSettings' && (
+                                    <div className="space-y-6">
+                                        {/* Theme */}
+                                        <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Dark/Light Mode</h3>
+                                            <div className="space-y-3">
+                                                <label className="flex items-center gap-3 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="theme"
+                                                        value="dark"
+                                                        checked={themeMode === 'dark'}
+                                                        onChange={() => setThemeMode('dark')}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span>Dark Mode (Default)</span>
+                                                </label>
+                                                <label className="flex items-center gap-3 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="theme"
+                                                        value="light"
+                                                        checked={themeMode === 'light'}
+                                                        onChange={() => setThemeMode('light')}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span>Light Mode</span>
+                                                </label>
+                                                <label className="flex items-center gap-3 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="theme"
+                                                        value="device"
+                                                        checked={themeMode === 'device'}
+                                                        onChange={() => setThemeMode('device')}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span>Use Device Settings</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        {/* Language */}
+                                        <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Language Settings</h3>
+                                            <select
+                                                value={language}
+                                                onChange={(e) => setLanguage(e.target.value)}
+                                                className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                            >
+                                                {languages.map(lang => (
+                                                    <option key={lang.code} value={lang.code}>{lang.name}</option>
+                                                ))}
+                                            </select>
+                                            <p className="text-gray-400 text-sm mt-2">Changes entire interface language (Note: Full translation requires backend support)</p>
+                                        </div>
+
+                                        {/* Currency */}
+                                        <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Currency Settings</h3>
+                                            <select
+                                                value={currency}
+                                                onChange={(e) => setCurrency(e.target.value)}
+                                                className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                            >
+                                                {currencies.map(curr => (
+                                                    <option key={curr.code} value={curr.code}>
+                                                        {curr.name} ({curr.symbol})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <p className="text-gray-400 text-sm mt-2">All prices will display in {currencyDisplay?.name}</p>
+                                        </div>
+
+                                        {/* Notifications */}
+                                        <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Notification Settings</h3>
+                                            <div className="space-y-3">
+                                                <label className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={notifications.inbox}
+                                                        onChange={(e) => setNotifications({ ...notifications, inbox: e.target.checked })}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span>Inbox Notifications</span>
+                                                </label>
+                                                <label className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={notifications.orders}
+                                                        onChange={(e) => setNotifications({ ...notifications, orders: e.target.checked })}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span>Order Notifications</span>
+                                                </label>
+                                                <label className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={notifications.verification}
+                                                        onChange={(e) => setNotifications({ ...notifications, verification: e.target.checked })}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span>Verification Updates</span>
+                                                </label>
+                                                <label className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={notifications.promotional}
+                                                        onChange={(e) => setNotifications({ ...notifications, promotional: e.target.checked })}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span>Promotional Notifications</span>
+                                                </label>
+                                            </div>
+
+                                            <div className="mt-4 pt-4 border-t border-[#D4AF37]">
+                                                <h4 className="text-lg font-semibold mb-3">Sound Notifications</h4>
+                                                <label className="flex items-center gap-3 mb-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={notifications.sound}
+                                                        onChange={(e) => setNotifications({ ...notifications, sound: e.target.checked })}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span>Enable Sound</span>
+                                                </label>
+                                                {notifications.sound && (
+                                                    <div className="space-y-3">
+                                                        <select
+                                                            value={notifications.selectedSound}
+                                                            onChange={(e) => setNotifications({ ...notifications, selectedSound: e.target.value })}
+                                                            className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                                        >
+                                                            {soundNotifications.map(sound => (
+                                                                <option key={sound.id} value={sound.id}>{sound.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        <button
+                                                            onClick={() => playNotificationSound(notifications.selectedSound)}
+                                                            className="w-full bg-[#D4AF37] text-black py-2 rounded-lg font-semibold hover:bg-opacity-80 transition-colors"
+                                                        >
+                                                            🔊 Test Sound
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Save Button */}
+                                        <button
+                                            onClick={saveSettings}
+                                            className="w-full bg-[#D4AF37] text-black py-3 rounded-lg font-bold hover:bg-opacity-80 transition-colors"
+                                        >
+                                            Save App Settings
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Security Settings */}
+                                {activeTab === 'security' && (
+                                    <div className="space-y-6">
+                                        {/* Change Password */}
+                                        <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Change Password</h3>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Old Password</label>
+                                                    <input
+                                                        type="password"
+                                                        value={passwordData.oldPassword}
+                                                        onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
+                                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                                        placeholder="Enter your old password"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-gray-300 text-sm font-semibold mb-2">New Password</label>
+                                                    <input
+                                                        type="password"
+                                                        value={passwordData.newPassword}
+                                                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                                        placeholder="Enter new password"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Confirm Password</label>
+                                                    <input
+                                                        type="password"
+                                                        value={passwordData.confirmPassword}
+                                                        onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                                        placeholder="Confirm new password"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={handleChangePassword}
+                                                    className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors"
+                                                >
+                                                    Update Password
+                                                </button>
+                                                <p className="text-gray-400 text-sm">After saving, you'll be logged out and need to login with your new password</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Biometric Authentication */}
+                                        {biometricAvailable && (
+                                            <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                                <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Biometric Authentication</h3>
+                                                <p className="text-gray-300 mb-4">Fingerprint or Face Unlock</p>
+                                                {biometricEnabled ? (
+                                                    <button
+                                                        onClick={handleDisableBiometric}
+                                                        className="w-full bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition-colors"
+                                                    >
+                                                        Disable Biometric Authentication
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleBiometricSetup}
+                                                        className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors"
+                                                    >
+                                                        Enable Biometric Authentication
+                                                    </button>
+                                                )}
+                                                <p className="text-gray-400 text-sm mt-2">Your device supports secure biometric authentication</p>
+                                            </div>
+                                        )}
+
+                                        {!biometricAvailable && (
+                                            <div className="bg-[#111111] border border-yellow-600 rounded-2xl p-8">
+                                                <h3 className="text-xl font-bold text-yellow-400 mb-4">Biometric Authentication</h3>
+                                                <p className="text-gray-300">Your device does not support biometric authentication</p>
+                                            </div>
+                                        )}
+
+                                        {/* Logout All Devices */}
+                                        <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Logout All Devices</h3>
+                                            <p className="text-gray-300 mb-4">Sign out from all devices and sessions</p>
+                                            <button
+                                                onClick={handleLogoutAllDevices}
+                                                className="w-full bg-orange-600 text-white py-3 rounded-lg font-bold hover:bg-orange-700 transition-colors"
+                                            >
+                                                Logout All Devices
+                                            </button>
+                                        </div>
+
+                                        {/* Two-Factor Authentication (Placeholder) */}
+                                        <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Two-Factor Authentication</h3>
+                                            <p className="text-gray-400">Coming soon - Additional security layer for your account</p>
+                                        </div>
+
+                                        {/* Account Deletion */}
+                                        <div className="bg-[#111111] border border-red-600 rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-red-400 mb-4">Delete Account</h3>
+                                            <p className="text-gray-300 mb-4">Permanently delete your account and all associated data</p>
+                                            <button
+                                                onClick={handleDeleteAccount}
+                                                className="w-full bg-red-700 text-white py-3 rounded-lg font-bold hover:bg-red-800 transition-colors"
+                                            >
+                                                Delete My Account
+                                            </button>
+                                            <p className="text-gray-400 text-sm mt-2">This action cannot be undone</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Store Settings (for sellers only) */}
+                                {activeTab === 'store' && currentUser.accountType === 'seller' && (
+                                    <div className="space-y-6">
+                                        <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Store Management</h3>
+                                            
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Store Name</label>
+                                                    <input
+                                                        type="text"
+                                                        value={storeData.storeName}
+                                                        onChange={(e) => setStoreData({ ...storeData, storeName: e.target.value })}
+                                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                                        placeholder="Your Store Name"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Business Description</label>
+                                                    <textarea
+                                                        value={storeData.businessDescription}
+                                                        onChange={(e) => setStoreData({ ...storeData, businessDescription: e.target.value })}
+                                                        rows="4"
+                                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                                        placeholder="Describe your business and what you sell"
+                                                    />
+                                                    <p className="text-gray-400 text-sm mt-1">Shown when buyers view your product details</p>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Shipping Information</label>
+                                                    <textarea
+                                                        value={storeData.shipping}
+                                                        onChange={(e) => setStoreData({ ...storeData, shipping: e.target.value })}
+                                                        rows="3"
+                                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                                        placeholder="Describe your shipping policies and costs"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Return Policy</label>
+                                                    <textarea
+                                                        value={storeData.returnPolicy}
+                                                        onChange={(e) => setStoreData({ ...storeData, returnPolicy: e.target.value })}
+                                                        rows="3"
+                                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                                        placeholder="Describe your return and refund policies"
+                                                    />
+                                                </div>
+
+                                                <div className="flex items-center gap-4">
+                                                    <label className="flex items-center gap-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={storeData.storeVisible}
+                                                            onChange={(e) => setStoreData({ ...storeData, storeVisible: e.target.checked })}
+                                                            className="w-4 h-4"
+                                                        />
+                                                        <span>Store is Visible</span>
+                                                    </label>
+                                                    <p className="text-gray-400 text-sm">Uncheck to hide your store temporarily</p>
+                                                </div>
+
+                                                <button
+                                                    onClick={saveSettings}
+                                                    className="w-full bg-[#D4AF37] text-black py-3 rounded-lg font-bold hover:bg-opacity-80 transition-colors"
+                                                >
+                                                    Save Store Settings
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Transaction History */}
+                                {activeTab === 'transactions' && (
+                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                        <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Transaction History</h3>
+                                        {transactions.length === 0 ? (
+                                            <p className="text-gray-400">No transactions yet</p>
+                                        ) : (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="border-b border-[#D4AF37]">
+                                                            <th className="text-left py-3">Order ID</th>
+                                                            <th className="text-left py-3">Type</th>
+                                                            <th className="text-left py-3">Amount</th>
+                                                            <th className="text-left py-3">Status</th>
+                                                            <th className="text-left py-3">Date</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {transactions.map(tx => (
+                                                            <tr key={tx.id} className="border-b border-[#222] hover:bg-[#222]">
+                                                                <td className="py-3">{tx.id}</td>
+                                                                <td className="py-3">{tx.buyerEmail === currentUser.email ? 'Purchase' : 'Sale'}</td>
+                                                                <td className="py-3">₦{tx.totalAmount?.toLocaleString() || '0'}</td>
+                                                                <td className="py-3">
+                                                                    <span className={`px-3 py-1 rounded text-sm ${tx.status === 'Completed' ? 'bg-green-600' : tx.status === 'Pending' ? 'bg-yellow-600' : 'bg-red-600'}`}>
+                                                                        {tx.status}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="py-3">{new Date(tx.createdAt).toLocaleDateString()}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Terms & Privacy */}
+                                {activeTab === 'terms' && (
+                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8 max-h-96 overflow-y-auto prose prose-invert">
+                                        <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Terms and Conditions</h3>
+                                        
+                                        <div className="space-y-4 text-gray-300 text-sm">
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Introduction</h4>
+                                                <p>Welcome to Joshua Luxury Store. By accessing or using our platform, you agree to comply with these Terms and Conditions.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Eligibility</h4>
+                                                <p>You must be at least 18 years old to use this platform. You are responsible for providing accurate information during registration and verification.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">User Accounts</h4>
+                                                <p>You are responsible for maintaining confidentiality of your account credentials and all activities performed through your account.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Seller Verification</h4>
+                                                <p>Sellers may be required to complete identity verification including government ID, face verification, banking details, and business information.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Marketplace Rules</h4>
+                                                <p>You must not sell counterfeit products, upload misleading information, harass others, or manipulate prices fraudulently.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Product Listings</h4>
+                                                <p>Sellers are fully responsible for product authenticity, descriptions, pricing accuracy, and customer communication.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Payments and Transactions</h4>
+                                                <p>Payments must be made through approved methods. Fraudulent payment activity is strictly prohibited.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Account Suspension and Termination</h4>
+                                                <p>We may suspend or terminate accounts involved in fraud, scams, abusive behavior, or policy violations.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Return Policy</h4>
+                                                <p>Sellers define their own return policies. Please review individual seller policies before purchasing.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Privacy</h4>
+                                                <p>Your information is handled securely and used only for verification, security, and operational purposes.</p>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="text-[#D4AF37] font-bold">Contact Support</h4>
+                                                <p>For disputes or inquiries, contact us through the official support channels within the application.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<SettingsPage />);
+    </script>
+</body>
+</html>
+
+
+

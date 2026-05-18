@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joshua Luxury Store - Profile</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: serif; }
+        .logo img {
+            width: 90px;
+            height: 90px;
+            object-fit: contain;
+            object-position: center;
+            display: block;
+            background: transparent;
+            border-radius: 50%;
+            padding: 4px;
+        }
+        @media (max-width: 768px) {
+            .logo img { width: 65px; height: 65px; }
+        }
+    </style>
+</head>
+<body class="bg-[#0b0b0b] text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Profile = () => {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [profileData, setProfileData] = useState({});
+            const [loading, setLoading] = useState(true);
+            const [bankDetailsVisible, setBankDetailsVisible] = useState(false);
+            const [messages, setMessages] = useState([]);
+            const [showSellerRequest, setShowSellerRequest] = useState(false);
+            const [sellerWhatsApp, setSellerWhatsApp] = useState('');
+            const [sellerAddress, setSellerAddress] = useState('');
+            const [error, setError] = useState('');
+            const unreadCount = messages.filter(msg => !msg.read).length;
+            const [verificationStatus, setVerificationStatus] = useState('none'); // 'none', 'pending', 'approved', 'rejected'
+
+            useEffect(() => {
+                const user = localStorage.getItem('jmpCurrentUser');
+                if (user) {
+                    const userData = JSON.parse(user);
+                    setCurrentUser(userData);
+                    setProfileData(userData);
+                    // Load messages for this user
+                    const allMessages = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                    const userMessages = allMessages
+                        .filter(msg => msg.recipientEmail === userData.email)
+                        .map(msg => ({ ...msg, read: msg.read ?? false }));
+                    setMessages(userMessages);
+                    
+                    // Check verification status
+                    const verificationRequests = JSON.parse(localStorage.getItem('jmpVerificationRequests') || '[]');
+                    const pendingRequest = verificationRequests.find(r => r.userEmail === userData.email);
+                    
+                    if (userData.verified) {
+                        setVerificationStatus('approved');
+                    } else if (pendingRequest) {
+                        setVerificationStatus('pending');
+                    } else {
+                        setVerificationStatus('none');
+                    }
+                }
+                
+                // Request notification permission
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
+                
+                setLoading(false);
+            }, []);
+
+            useEffect(() => {
+                if (!currentUser) return;
+                
+                const handleStorageChange = (event) => {
+                    if (event.key !== 'jmpMessages') return;
+                    try {
+                        const allMessages = JSON.parse(event.newValue || '[]');
+                        const userMessages = allMessages
+                            .filter(msg => msg.recipientEmail === currentUser.email)
+                            .map(msg => ({ ...msg, read: msg.read ?? false }));
+                        setMessages(userMessages);
+                        
+                        // Show notification for new messages
+                        const lastMessage = userMessages[userMessages.length - 1];
+                        if (lastMessage && 'Notification' in window && Notification.permission === 'granted') {
+                            new Notification(lastMessage.title, {
+                                body: lastMessage.content,
+                                icon: 'image/my-logo.png',
+                                tag: lastMessage.id
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Error processing message:', error);
+                    }
+                };
+
+                window.addEventListener('storage', handleStorageChange);
+                return () => window.removeEventListener('storage', handleStorageChange);
+            }, [currentUser]);
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setProfileData(prev => ({
+                    ...prev,
+                    [name]: value
+                }));
+            };
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setProfileData(prev => ({
+                        ...prev,
+                        picture: event.target.result
+                    }));
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const handleSellerRequest = (e) => {
+                e.preventDefault();
+                setError('');
+
+                if (!sellerWhatsApp || !sellerAddress) {
+                    setError('Please provide both WhatsApp and address to submit your seller request.');
+                    return;
+                }
+
+                const updatedUser = {
+                    ...currentUser,
+                    role: 'seller',
+                    sellerStatus: 'pending_approval',
+                    businessWhatsApp: sellerWhatsApp,
+                    businessAddress: sellerAddress
+                };
+
+                localStorage.setItem('jmpCurrentUser', JSON.stringify(updatedUser));
+                setCurrentUser(updatedUser);
+
+                const users = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                const userIndex = users.findIndex(u => u.email === currentUser.email);
+                if (userIndex !== -1) {
+                    users[userIndex] = updatedUser;
+                    localStorage.setItem('jmpUsers', JSON.stringify(users));
+                }
+
+                const allMsgs = JSON.parse(localStorage.getItem('jmpMessages') || '[]');
+                allMsgs.push({
+                    id: Date.now().toString(),
+                    recipientEmail: currentUser.email,
+                    title: 'Seller Request Submitted',
+                    content: 'Your seller request has been sent for approval. You will be notified once reviewed.',
+                    time: new Date().toLocaleString(),
+                    read: false
+                });
+                localStorage.setItem('jmpMessages', JSON.stringify(allMsgs));
+                setMessages(allMsgs.filter(m => m.recipientEmail === currentUser.email));
+
+                setShowSellerRequest(false);
+                setSellerWhatsApp('');
+                setSellerAddress('');
+                alert('Your seller request has been submitted for approval!');
+            };
+
+            const handleSave = () => {
+                const updatedUser = {
+                    ...currentUser,
+                    ...profileData
+                };
+
+                // Update in localStorage
+                const users = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                const index = users.findIndex(u => u.email === currentUser.email);
+                if (index !== -1) {
+                    users[index] = updatedUser;
+                    localStorage.setItem('jmpUsers', JSON.stringify(users));
+                }
+
+                // Update current user
+                localStorage.setItem('jmpCurrentUser', JSON.stringify(updatedUser));
+                setCurrentUser(updatedUser);
+
+                alert('Profile updated successfully!');
+            };
+
+            const handleCancel = () => {
+                setProfileData(currentUser);
+                alert('Changes cancelled.');
+            };
+
+            if (loading) return <div className="text-center pt-20">Loading...</div>;
+
+            return (
+                <div className="min-h-screen bg-[#0b0b0b] text-white">
+                    {/* Header */}
+                    <header className="bg-[#111111] border-b border-[#D4AF37] px-6 py-4">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between">
+                            <div className="flex flex-col items-center logo">
+                                <img src="image/my-logo.png" alt="Joshua Luxury Store Logo" />
+                                <div className="text-sm font-bold text-[#D4AF37]">Joshua Luxury Store</div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => window.location.href = 'index.html#/inbox'}
+                                    className="relative border border-[#D4AF37] text-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37] hover:text-black transition-colors"
+                                >
+                                    📬 Inbox
+                                    {unreadCount > 0 && (
+                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                            {unreadCount}
+                                        </span>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => window.location.href = './Marketplace.html'}
+                                    className="border border-[#D4AF37] text-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37] hover:text-black transition-colors"
+                                >
+                                    Back to Marketplace
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <div className="max-w-2xl mx-auto px-6 py-10">
+                        <h1 className="text-4xl md:text-5xl font-bold text-[#D4AF37] mb-10">👤 Edit Profile</h1>
+
+                        <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 space-y-6">
+                            {/* Profile Picture */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-3">Profile Picture</label>
+                                <div className="w-24 h-24 mx-auto bg-gray-800 rounded-full border-2 border-[#D4AF37] flex items-center justify-center mb-4 relative">
+                                    {profileData.picture ? (
+                                        <img src={profileData.picture} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                                    ) : (
+                                        <span className="text-4xl">👤</span>
+                                    )}
+                                    {currentUser.verified && (
+                                        <div className="absolute -top-1 -right-1 bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+                                            ✓
+                                        </div>
+                                    )}
+                                </div>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                                <p className="text-xs text-gray-400 mt-2">Upload an image file to update your profile picture.</p>
+                            </div>
+
+                            {/* First Name */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">First Name</label>
+                                <input
+                                    type="text"
+                                    name="firstName"
+                                    value={profileData.firstName || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                            </div>
+
+                            {/* Last Name */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Last Name</label>
+                                <input
+                                    type="text"
+                                    name="lastName"
+                                    value={profileData.lastName || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                            </div>
+
+                            {/* Username */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Username</label>
+                                <input
+                                    type="text"
+                                    name="username"
+                                    value={profileData.username || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                            </div>
+
+                            {/* Email (Read Only) */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Email</label>
+                                <input
+                                    type="email"
+                                    value={profileData.email || ''}
+                                    readOnly
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-gray-500 px-4 py-3 rounded-lg cursor-not-allowed"
+                                />
+                            </div>
+
+                            {/* Phone */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Phone Number</label>
+                                <input
+                                    type="tel"
+                                    name="phone"
+                                    value={profileData.phone || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                            </div>
+
+                            {/* Bank Details Section */}
+                            <div>
+                                <button
+                                    onClick={() => setBankDetailsVisible(!bankDetailsVisible)}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-[#D4AF37] px-4 py-3 rounded-lg font-semibold hover:bg-[#333] transition-colors"
+                                >
+                                    {bankDetailsVisible ? '▼ Bank Details' : '▶ Bank Details'}
+                                </button>
+
+                                {bankDetailsVisible && (
+                                    <div className="mt-6 space-y-4 border-t border-[#D4AF37] pt-6">
+                                        {/* Bank Name */}
+                                        <div>
+                                            <label className="block text-gray-300 text-sm font-semibold mb-2">Bank Name</label>
+                                            <input
+                                                type="text"
+                                                name="bankName"
+                                                value={profileData.bankName || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                            />
+                                        </div>
+
+                                        {/* Account Number */}
+                                        <div>
+                                            <label className="block text-gray-300 text-sm font-semibold mb-2">Account Number</label>
+                                            <input
+                                                type="text"
+                                                name="accountNumber"
+                                                value={profileData.accountNumber || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                            />
+                                        </div>
+
+                                        {/* Account Name */}
+                                        <div>
+                                            <label className="block text-gray-300 text-sm font-semibold mb-2">Account Name</label>
+                                            <input
+                                                type="text"
+                                                name="accountName"
+                                                value={profileData.accountName || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Buttons */}
+                            <div className="flex gap-4 pt-6 border-t border-[#D4AF37]">
+                                <button
+                                    onClick={handleSave}
+                                    className="flex-1 bg-[#D4AF37] text-black py-3 rounded-lg font-bold text-lg hover:bg-opacity-80 transition-colors"
+                                >
+                                    Save Changes
+                                </button>
+                                <button
+                                    onClick={handleCancel}
+                                    className="flex-1 border border-[#D4AF37] text-[#D4AF37] py-3 rounded-lg font-bold text-lg hover:bg-[#D4AF37] hover:text-black transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+
+                            {currentUser?.role === 'buyer' && (
+                                <div className="pt-6 border-t border-[#D4AF37] mt-6">
+                                    <button
+                                        onClick={() => setShowSellerRequest(true)}
+                                        className="w-full bg-[#D4AF37] text-black py-3 rounded-lg font-bold text-lg hover:bg-opacity-80 transition-colors"
+                                    >
+                                        💼 Become a Seller
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Get Verified Button */}
+                            <div className="pt-6 border-t border-[#D4AF37] mt-6">
+                                {verificationStatus === 'approved' ? (
+                                    <button
+                                        disabled
+                                        className="w-full bg-green-600 text-white py-3 rounded-lg font-bold text-lg cursor-not-allowed opacity-80"
+                                    >
+                                        ✅ Verified
+                                    </button>
+                                ) : verificationStatus === 'pending' ? (
+                                    <button
+                                        disabled
+                                        className="w-full bg-yellow-600 text-white py-3 rounded-lg font-bold text-lg cursor-not-allowed opacity-80"
+                                    >
+                                        ⏳ Waiting for Feedback
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => window.location.href = 'verification-notice.html'}
+                                        className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-blue-700 transition-colors"
+                                    >
+                                        Get Verified
+                                    </button>
+                                )}
+                            </div>
+
+                            {showSellerRequest && (
+                                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 w-full max-w-md shadow-2xl">
+                                        <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Become a Seller</h2>
+                                        <form onSubmit={handleSellerRequest} className="space-y-5">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">Business WhatsApp Number</label>
+                                                <input
+                                                    type="tel"
+                                                    value={sellerWhatsApp}
+                                                    onChange={(e) => setSellerWhatsApp(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-gray-800 border border-[#D4AF37] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                                                    placeholder="+1234567890"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">Business Address</label>
+                                                <textarea
+                                                    value={sellerAddress}
+                                                    onChange={(e) => setSellerAddress(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-gray-800 border border-[#D4AF37] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                                                    placeholder="Enter your business address"
+                                                    rows="3"
+                                                />
+                                            </div>
+                                            {error && (
+                                                <div className="text-red-400 text-sm text-center">{error}</div>
+                                            )}
+                                            <div className="flex gap-4 pt-4">
+                                                <button
+                                                    type="submit"
+                                                    className="flex-1 bg-[#D4AF37] text-black py-3 rounded-lg font-bold hover:bg-opacity-80 transition-colors"
+                                                >
+                                                    Submit Request
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowSellerRequest(false);
+                                                        setSellerWhatsApp('');
+                                                        setSellerAddress('');
+                                                        setError('');
+                                                    }}
+                                                    className="flex-1 border border-[#D4AF37] text-[#D4AF37] py-3 rounded-lg font-bold hover:bg-[#D4AF37] hover:text-black transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+
+                        {/* Inbox Section */}
+                        <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 mt-8">
+                            <h2 className="text-2xl font-bold text-[#D4AF37] mb-6">📬 Inbox</h2>
+                            {messages.length === 0 ? (
+                                <p className="text-gray-400">No messages yet.</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    {messages.map(message => (
+                                        <div key={message.id} className="bg-[#222] border border-[#D4AF37] rounded-lg p-4">
+                                            <h3 className="text-white font-semibold mb-2">{message.title}</h3>
+                                            <p className="text-gray-300 mb-2">{message.content}</p>
+                                            <p className="text-gray-500 text-xs">{message.time}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<Profile />);
+    </script>
+</body>
+</html>
+
+

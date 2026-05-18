@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "public": ".",
+  "routes": [
+    { "src": "/image/(.*)", "dest": "/image/$1" },
+    { "src": "/(.*\\..*)", "dest": "/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}

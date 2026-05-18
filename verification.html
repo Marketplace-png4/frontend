@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joshua Luxury Store - Verification</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: serif; }
+        .logo img {
+            width: 90px;
+            height: 90px;
+            object-fit: contain;
+            object-position: center;
+            display: block;
+            background: transparent;
+            border-radius: 50%;
+            padding: 4px;
+        }
+        @media (max-width: 768px) {
+            .logo img { width: 65px; height: 65px; }
+        }
+    </style>
+</head>
+<body class="bg-[#0b0b0b] text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Verification = () => {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [step, setStep] = useState('form'); // 'form', 'success'
+            const [formData, setFormData] = useState({
+                firstName: '',
+                lastName: '',
+                facePicture: '',
+                phone: '',
+                whatsapp: '',
+                email: '',
+                idType: '',
+                idPicture: '',
+                selfiePicture: '',
+                nationalIdNumber: '',
+                driversLicenseNumber: '',
+                passportNumber: '',
+                votersCardNumber: '',
+                bankName: '',
+                accountNumber: '',
+                accountName: '',
+                storeName: '',
+                businessDescription: '',
+                businessAddress: '',
+                socialMedia: ''
+            });
+            const [errors, setErrors] = useState({});
+            const [loading, setLoading] = useState(true);
+            const [savingStatus, setSavingStatus] = useState(''); // 'saving', 'saved', 'error'
+
+            useEffect(() => {
+                const user = localStorage.getItem('jmpCurrentUser');
+                if (user) {
+                    const userData = JSON.parse(user);
+                    setCurrentUser(userData);
+                    // Load saved form data if exists
+                    const savedForm = localStorage.getItem(`jmpVerificationForm_${userData.email}`);
+                    if (savedForm) {
+                        setFormData(JSON.parse(savedForm));
+                    }
+                }
+                setLoading(false);
+            }, []);
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({
+                    ...prev,
+                    [name]: value
+                }));
+            };
+
+            const handleImageUpload = (field) => (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setFormData(prev => ({
+                        ...prev,
+                        [field]: event.target.result
+                    }));
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const validateForm = () => {
+                const newErrors = {};
+                if (!formData.firstName) newErrors.firstName = 'First name is required';
+                if (!formData.lastName) newErrors.lastName = 'Last name is required';
+                if (!formData.facePicture) newErrors.facePicture = 'Face picture is required';
+                if (!formData.phone) newErrors.phone = 'Phone number is required';
+                if (!formData.whatsapp) newErrors.whatsapp = 'WhatsApp link is required';
+                if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Valid email is required';
+                if (!formData.idType) newErrors.idType = 'ID type is required';
+                if (!formData.idPicture) newErrors.idPicture = 'ID picture is required';
+                if (!formData.selfiePicture) newErrors.selfiePicture = 'A selfie with your ID is required';
+                if (formData.idType === 'National ID') {
+                    if (!formData.nationalIdNumber || formData.nationalIdNumber.replace(/\D/g, '').length !== 11) newErrors.nationalIdNumber = '11-digit National ID number is required';
+                }
+                if (formData.idType === "Driver's License" && !formData.driversLicenseNumber) newErrors.driversLicenseNumber = 'Driver license number is required';
+                if (formData.idType === 'International Passport' && !formData.passportNumber) newErrors.passportNumber = 'Passport number is required';
+                if (formData.idType === "Voter's Card" && !formData.votersCardNumber) newErrors.votersCardNumber = 'Voter card number is required';
+                if (!formData.bankName) newErrors.bankName = 'Bank name is required';
+                if (!formData.accountNumber) newErrors.accountNumber = 'Account number is required';
+                if (!formData.accountName) newErrors.accountName = 'Account name is required';
+                if (!formData.storeName) newErrors.storeName = 'Store name is required';
+                if (!formData.businessDescription) newErrors.businessDescription = 'Business description is required';
+                if (!formData.businessAddress) newErrors.businessAddress = 'Business address is required';
+                setErrors(newErrors);
+                return Object.keys(newErrors).length === 0;
+            };
+
+            const handleSave = () => {
+                setSavingStatus('saving');
+                
+                // Save form data (text fields only, without images)
+                const textOnlyData = {
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    phone: formData.phone,
+                    whatsapp: formData.whatsapp,
+                    email: formData.email,
+                    idType: formData.idType,
+                    nationalIdNumber: formData.nationalIdNumber,
+                    driversLicenseNumber: formData.driversLicenseNumber,
+                    passportNumber: formData.passportNumber,
+                    votersCardNumber: formData.votersCardNumber,
+                    bankName: formData.bankName,
+                    accountNumber: formData.accountNumber,
+                    accountName: formData.accountName,
+                    storeName: formData.storeName,
+                    businessDescription: formData.businessDescription,
+                    businessAddress: formData.businessAddress,
+                    socialMedia: formData.socialMedia
+                };
+                
+                localStorage.setItem(`jmpVerificationForm_${currentUser.email}`, JSON.stringify(textOnlyData));
+                
+                // Show success message for 3 seconds
+                setSavingStatus('saved');
+                setTimeout(() => {
+                    setSavingStatus('');
+                }, 3000);
+            };
+
+            const handleSubmit = () => {
+                if (!validateForm()) return;
+
+                // Send to admin
+                const verificationRequests = JSON.parse(localStorage.getItem('jmpVerificationRequests') || '[]');
+                verificationRequests.push({
+                    id: Date.now().toString(),
+                    userEmail: currentUser.email,
+                    userName: `${currentUser.firstName || currentUser.name || currentUser.username} ${currentUser.lastName || ''}`.trim(),
+                    submittedAt: new Date().toISOString(),
+                    data: formData
+                });
+                localStorage.setItem('jmpVerificationRequests', JSON.stringify(verificationRequests));
+
+                // Clear saved form
+                localStorage.removeItem(`jmpVerificationForm_${currentUser.email}`);
+
+                // Show success popup
+                setStep('success');
+            };
+
+            const handleBack = () => {
+                window.location.href = 'profile.html';
+            };
+
+            if (loading) return <div className="text-center pt-20">Loading...</div>;
+
+            if (!currentUser) return <div className="text-center pt-20">Please login first.</div>;
+
+            // Check if user has at least 1 approved product
+            const products = JSON.parse(localStorage.getItem('jmpProducts') || '[]');
+            const userApprovedProducts = products.filter(p => p.userEmail === currentUser.email && p.status === 'Approved');
+            if (userApprovedProducts.length === 0) {
+                return (
+                    <div className="min-h-screen bg-[#0b0b0b] text-white flex items-center justify-center px-4">
+                        <div className="w-full max-w-md bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 shadow-2xl">
+                            <h1 className="text-4xl text-[#D4AF37] text-center mb-8 font-bold">Verification</h1>
+                            <p className="text-gray-300 mb-6">You need at least one active and approved product before you can request verification.</p>
+                            <button
+                                onClick={handleBack}
+                                className="w-full bg-[#D4AF37] text-black py-3 px-4 rounded-md font-semibold hover:bg-opacity-80 transition-colors"
+                            >
+                                Back to Profile
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Success Page
+            if (step === 'success') {
+                return (
+                    <div className="min-h-screen bg-[#0b0b0b] text-white flex flex-col items-center justify-center px-4">
+                        <div className="w-full max-w-md bg-[#111111] border border-green-500 rounded-3xl p-8 shadow-2xl text-center">
+                            <div className="text-6xl mb-4">✅</div>
+                            <h2 className="text-3xl font-bold text-green-400 mb-4">Verification Submitted!</h2>
+                            <p className="text-gray-300 mb-8">You've successfully submitted verification. Your request is now waiting for admin approval.</p>
+                            <button
+                                onClick={() => window.location.href = 'Marketplace.html'}
+                                className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors"
+                            >
+                                Back to Marketplace
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-[#0b0b0b] text-white">
+                    {/* Header */}
+                    <header className="bg-[#111111] border-b border-[#D4AF37] px-6 py-4">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between">
+                            <div className="flex flex-col items-center logo">
+                                <img src="image/my-logo.png" alt="Joshua Luxury Store Logo" />
+                                <div className="text-sm font-bold text-[#D4AF37]">Joshua Luxury Store</div>
+                            </div>
+                            <button
+                                onClick={handleBack}
+                                className="border border-[#D4AF37] text-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37] hover:text-black transition-colors"
+                            >
+                                Back to Profile
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Form Content */}
+                    <div className="max-w-4xl mx-auto px-6 py-10">
+                        {/* Save Success Notification */}
+                        {savingStatus === 'saving' && (
+                            <div className="mb-6 p-4 bg-blue-600 text-white rounded-lg flex items-center gap-3">
+                                <span className="animate-spin">⚙️</span>
+                                <span>Saving your form...</span>
+                            </div>
+                        )}
+                        {savingStatus === 'saved' && (
+                            <div className="mb-6 p-4 bg-green-600 text-white rounded-lg flex items-center gap-3">
+                                <span>✅</span>
+                                <span>Form saved successfully! You can complete it later.</span>
+                            </div>
+                        )}
+
+                        <h1 className="text-4xl md:text-5xl font-bold text-[#D4AF37] mb-10 text-center">Verification Form</h1>
+                        <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 space-y-6">
+                            {/* Full Name */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">First Name</label>
+                                    <input
+                                        type="text"
+                                        name="firstName"
+                                        value={formData.firstName}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.firstName && <p className="text-red-400 text-sm mt-1">{errors.firstName}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Last Name</label>
+                                    <input
+                                        type="text"
+                                        name="lastName"
+                                        value={formData.lastName}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.lastName && <p className="text-red-400 text-sm mt-1">{errors.lastName}</p>}
+                                </div>
+                            </div>
+
+                            {/* Face Picture */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-3">Clear Face Picture</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload('facePicture')}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                                {formData.facePicture && <img src={formData.facePicture} alt="Face" className="w-24 h-24 rounded-full mt-4" />}
+                                {errors.facePicture && <p className="text-red-400 text-sm mt-1">{errors.facePicture}</p>}
+                            </div>
+
+                            {/* Phone and WhatsApp */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        name="phone"
+                                        value={formData.phone}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.phone && <p className="text-red-400 text-sm mt-1">{errors.phone}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">WhatsApp Link</label>
+                                    <input
+                                        type="url"
+                                        name="whatsapp"
+                                        value={formData.whatsapp}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.whatsapp && <p className="text-red-400 text-sm mt-1">{errors.whatsapp}</p>}
+                                </div>
+                            </div>
+
+                            {/* Email */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Valid Email Address</label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                                {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
+                            </div>
+
+                            {/* ID Type */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Government ID Type</label>
+                                <select
+                                    name="idType"
+                                    value={formData.idType}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                >
+                                    <option value="">Select ID Type</option>
+                                    <option value="National ID">National ID</option>
+                                    <option value="Driver's License">Driver's License</option>
+                                    <option value="International Passport">International Passport</option>
+                                    <option value="Voter's Card">Voter's Card</option>
+                                </select>
+                                {errors.idType && <p className="text-red-400 text-sm mt-1">{errors.idType}</p>}
+                            </div>
+
+                            {/* ID Picture */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-3">Upload ID Picture</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload('idPicture')}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                                {formData.idPicture && <img src={formData.idPicture} alt="ID" className="w-48 h-32 mt-4 rounded" />}
+                                {errors.idPicture && <p className="text-red-400 text-sm mt-1">{errors.idPicture}</p>}
+                            </div>
+
+                            {/* Selfie for National ID */}
+                            {formData.idType && (
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-3">Selfie with your ID</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageUpload('selfiePicture')}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {formData.selfiePicture && <img src={formData.selfiePicture} alt="Selfie" className="w-48 h-32 mt-4 rounded" />}
+                                    {errors.selfiePicture && <p className="text-red-400 text-sm mt-1">{errors.selfiePicture}</p>}
+                                </div>
+                            )}
+
+                            {/* National ID Number */}
+                            {formData.idType === 'National ID' && (
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">11-Digit National ID Number</label>
+                                    <input
+                                        type="text"
+                                        name="nationalIdNumber"
+                                        value={formData.nationalIdNumber}
+                                        onChange={handleInputChange}
+                                        maxLength="11"
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.nationalIdNumber && <p className="text-red-400 text-sm mt-1">{errors.nationalIdNumber}</p>}
+                                </div>
+                            )}
+
+                            {formData.idType === "Driver's License" && (
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Driver's License Number</label>
+                                    <input
+                                        type="text"
+                                        name="driversLicenseNumber"
+                                        value={formData.driversLicenseNumber}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.driversLicenseNumber && <p className="text-red-400 text-sm mt-1">{errors.driversLicenseNumber}</p>}
+                                </div>
+                            )}
+
+                            {formData.idType === 'International Passport' && (
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Passport Number</label>
+                                    <input
+                                        type="text"
+                                        name="passportNumber"
+                                        value={formData.passportNumber}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.passportNumber && <p className="text-red-400 text-sm mt-1">{errors.passportNumber}</p>}
+                                </div>
+                            )}
+
+                            {formData.idType === "Voter's Card" && (
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Voter's Card Number</label>
+                                    <input
+                                        type="text"
+                                        name="votersCardNumber"
+                                        value={formData.votersCardNumber}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.votersCardNumber && <p className="text-red-400 text-sm mt-1">{errors.votersCardNumber}</p>}
+                                </div>
+                            )}
+
+                            {/* Bank Details */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Bank Name</label>
+                                    <input
+                                        type="text"
+                                        name="bankName"
+                                        value={formData.bankName}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.bankName && <p className="text-red-400 text-sm mt-1">{errors.bankName}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Account Number</label>
+                                    <input
+                                        type="text"
+                                        name="accountNumber"
+                                        value={formData.accountNumber}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.accountNumber && <p className="text-red-400 text-sm mt-1">{errors.accountNumber}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-semibold mb-2">Account Name</label>
+                                    <input
+                                        type="text"
+                                        name="accountName"
+                                        value={formData.accountName}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                    />
+                                    {errors.accountName && <p className="text-red-400 text-sm mt-1">{errors.accountName}</p>}
+                                </div>
+                            </div>
+
+                            {/* Store Name */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Store Name</label>
+                                <input
+                                    type="text"
+                                    name="storeName"
+                                    value={formData.storeName}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                                {errors.storeName && <p className="text-red-400 text-sm mt-1">{errors.storeName}</p>}
+                            </div>
+
+                            {/* Business Description */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Business Description/Bio</label>
+                                <textarea
+                                    name="businessDescription"
+                                    value={formData.businessDescription}
+                                    onChange={handleInputChange}
+                                    rows="4"
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                                {errors.businessDescription && <p className="text-red-400 text-sm mt-1">{errors.businessDescription}</p>}
+                            </div>
+
+                            {/* Business Address */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Business Address</label>
+                                <input
+                                    type="text"
+                                    name="businessAddress"
+                                    value={formData.businessAddress}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                                {errors.businessAddress && <p className="text-red-400 text-sm mt-1">{errors.businessAddress}</p>}
+                            </div>
+
+                            {/* Social Media (Optional) */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-semibold mb-2">Social Media Page (Optional)</label>
+                                <input
+                                    type="url"
+                                    name="socialMedia"
+                                    value={formData.socialMedia}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                />
+                            </div>
+
+                            {/* Buttons */}
+                            <div className="flex gap-4 mt-8">
+                                <button
+                                    onClick={handleSave}
+                                    className="flex-1 border border-[#D4AF37] text-[#D4AF37] py-3 rounded-full font-semibold hover:bg-[#D4AF37] hover:text-black"
+                                >
+                                    Save
+                                </button>
+                                <button
+                                    onClick={handleBack}
+                                    className="flex-1 border border-[#D4AF37] text-[#D4AF37] py-3 rounded-full font-semibold hover:bg-[#D4AF37] hover:text-black"
+                                >
+                                    Back
+                                </button>
+                                <button
+                                    onClick={handleSubmit}
+                                    className="flex-1 bg-[#D4AF37] text-black py-3 rounded-full font-semibold hover:bg-opacity-80"
+                                >
+                                    Submit Verification
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<Verification />);
+    </script>
+</body>
+</html></content>
+

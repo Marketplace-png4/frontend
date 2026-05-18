@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joshua Luxury Store - Verification Notice</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: serif; }
+        .logo img {
+            width: 90px;
+            height: 90px;
+            object-fit: contain;
+            object-position: center;
+            display: block;
+            background: transparent;
+            border-radius: 50%;
+            padding: 4px;
+        }
+        @media (max-width: 768px) {
+            .logo img { width: 65px; height: 65px; }
+        }
+    </style>
+</head>
+<body class="bg-[#0b0b0b] text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const VerificationNotice = () => {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const user = localStorage.getItem('jmpCurrentUser');
+                if (user) {
+                    setCurrentUser(JSON.parse(user));
+                } else {
+                    window.location.href = 'index.html';
+                }
+                setLoading(false);
+            }, []);
+
+            const handleBack = () => {
+                window.location.href = 'profile.html';
+            };
+
+            const handleNext = () => {
+                window.location.href = 'verification.html';
+            };
+
+            // Check if user has at least 1 approved product
+            if (!loading && currentUser) {
+                const products = JSON.parse(localStorage.getItem('jmpProducts') || '[]');
+                const userApprovedProducts = products.filter(p => p.userEmail === currentUser.email && p.status === 'Approved');
+                if (userApprovedProducts.length === 0) {
+                    return (
+                        <div className="min-h-screen bg-[#0b0b0b] text-white flex items-center justify-center px-4">
+                            <div className="w-full max-w-md bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 shadow-2xl">
+                                <h1 className="text-4xl text-[#D4AF37] text-center mb-8 font-bold">Verification</h1>
+                                <p className="text-gray-300 mb-6">You need at least one active and approved product before you can request verification.</p>
+                                <button
+                                    onClick={handleBack}
+                                    className="w-full bg-[#D4AF37] text-black py-3 px-4 rounded-md font-semibold hover:bg-opacity-80 transition-colors"
+                                >
+                                    Back to Profile
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+            }
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-[#0b0b0b] text-white flex items-center justify-center">
+                        <div className="text-[#D4AF37] text-xl">Loading...</div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-[#0b0b0b] text-white">
+                    {/* Header */}
+                    <header className="bg-[#111111] border-b border-[#D4AF37] px-6 py-4">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between">
+                            <div className="flex flex-col items-center logo">
+                                <img src="image/my-logo.png" alt="Joshua Luxury Store Logo" />
+                                <div className="text-sm font-bold text-[#D4AF37]">Joshua Luxury Store</div>
+                            </div>
+                            <button
+                                onClick={handleBack}
+                                className="border border-[#D4AF37] text-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37] hover:text-black transition-colors"
+                            >
+                                Back to Profile
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Notice Content */}
+                    <div className="max-w-4xl mx-auto px-6 py-10">
+                        <h1 className="text-4xl md:text-5xl font-bold text-[#D4AF37] mb-10 text-center">Verification Notice</h1>
+                        <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-8 space-y-6">
+                            <h2 className="text-2xl font-bold text-[#D4AF37] mb-4">What You Need to Know</h2>
+                            <ul className="list-disc list-inside text-gray-300 space-y-2">
+                                <li>Verification review takes up to 3-5 working days.</li>
+                                <li>All information must be accurate and verifiable.</li>
+                                <li>Face picture must be clear and show your face clearly (no cartoons or filters).</li>
+                                <li>Government ID must be valid and clearly visible.</li>
+                                <li>For National ID, a selfie holding the ID is required.</li>
+                                <li>You must have at least one active approved product.</li>
+                                <li>Bank details must be for non-microfinance institutions.</li>
+                                <li>All uploaded images will be reviewed for authenticity.</li>
+                            </ul>
+
+                            <h2 className="text-2xl font-bold text-[#D4AF37] mb-4">Required Information</h2>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-white mb-2">Personal Information</h3>
+                                    <ul className="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                                        <li>First Name & Last Name</li>
+                                        <li>Clear face picture</li>
+                                        <li>Phone number</li>
+                                        <li>WhatsApp link</li>
+                                        <li>Valid email address</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-white mb-2">Identification</h3>
+                                    <ul className="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                                        <li>Government ID type</li>
+                                        <li>Clear ID picture</li>
+                                        <li>Selfie with ID (for National ID)</li>
+                                        <li>National ID number (if applicable)</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-white mb-2">Banking Details</h3>
+                                    <ul className="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                                        <li>Bank name (non-microfinance)</li>
+                                        <li>Account number</li>
+                                        <li>Account name</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-white mb-2">Business Information</h3>
+                                    <ul className="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                                        <li>Store name</li>
+                                        <li>Business description/bio</li>
+                                        <li>Business address</li>
+                                        <li>Social media page (optional)</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div className="bg-yellow-900 border border-yellow-600 rounded-lg p-4 mt-6">
+                                <h3 className="text-yellow-400 font-semibold mb-2">⚠️ Important Notes</h3>
+                                <ul className="text-yellow-200 text-sm space-y-1">
+                                    <li>Make sure all information matches your government ID exactly.</li>
+                                    <li>Face pictures must be recent and clearly show your face.</li>
+                                    <li>ID pictures must be legible and show all details.</li>
+                                    <li>You can save your progress and return later to complete the form.</li>
+                                    <li>Once submitted, you cannot edit your verification request.</li>
+                                </ul>
+                            </div>
+
+                            {/* Buttons */}
+                            <div className="flex gap-4 pt-6 border-t border-[#D4AF37]">
+                                <button
+                                    onClick={handleBack}
+                                    className="flex-1 border border-[#D4AF37] text-[#D4AF37] py-3 rounded-lg font-bold text-lg hover:bg-[#D4AF37] hover:text-black transition-colors"
+                                >
+                                    Back
+                                </button>
+                                <button
+                                    onClick={handleNext}
+                                    className="flex-1 bg-[#D4AF37] text-black py-3 rounded-lg font-bold text-lg hover:bg-opacity-80 transition-colors"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<VerificationNotice />);
+    </script>
+</body>
+</html>
+
