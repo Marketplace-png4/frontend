@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "public": ".",
+  "public": true,
   "routes": [
     { "src": "/image/(.*)", "dest": "/image/$1" },
     { "src": "/(.*\\..*)", "dest": "/$1" },
