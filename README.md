@@ -32,12 +32,15 @@ Click the "J" logo 4 times within 2 seconds to navigate to the admin login page.
 
 ## Deployment
 
-### Frontend (Netlify)
+### Frontend (Vercel)
 
-- Build command: `npm run build`
+- Build command: `npm run vercel-build`
 - Publish directory: `dist`
-- Set environment variable: `VITE_API_URL=https://new-backend-nlxi.onrender.com`
-- Ensure `public/_redirects` contains `/* /index.html 200` for React routing.
+- Set environment variables in Vercel:
+  - `VITE_API_URL=https://new-backend-nlxi.onrender.com`
+  - `VITE_SUPABASE_URL=https://wmicteyitftiszwkqwkv.supabase.co`
+  - `VITE_SUPABASE_ANON_KEY=sb_publishable_3NFNiep9OSzwqEf6kTbFzQ_VoVUHLqt`
+- Vercel will use `vercel.json` for SPA fallback routing to `index.html`.
 
 ### Backend (Render / Railway)
 
