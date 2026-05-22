@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { api } from '../api.js';
+import { saveAuthSession } from '../lib/auth.js';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -19,23 +22,20 @@ const Signup = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
   };
 
   const validateEmail = (email) => {
-    // Only accept valid domain emails
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
@@ -58,7 +58,6 @@ const Signup = () => {
     if (formData.accountType === 'seller' && !formData.whatsapp) {
       newErrors.whatsapp = 'WhatsApp number is required for sellers';
     }
-    // Address fields required only for sellers
     if (formData.accountType === 'seller') {
       if (!formData.streetAddress.trim()) newErrors.streetAddress = 'Street address is required for sellers';
       if (!formData.city.trim()) newErrors.city = 'City is required for sellers';
@@ -70,62 +69,21 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
 
     setLoading(true);
+    setErrors({});
 
     try {
-      // Get existing users
-      const existingUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
-      
-      // Check if email already exists
-      if (existingUsers.some(user => user.email === formData.email)) {
-        setErrors({ email: 'This email is already registered' });
-        setLoading(false);
-        return;
-      }
-
-      // Create new user
-      const newUser = {
-        id: Date.now().toString(),
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        password: formData.password, // In production, hash this!
-        accountType: formData.accountType,
-        phone: formData.phone,
-        whatsapp: formData.whatsapp || null,
-        streetAddress: formData.streetAddress,
-        city: formData.city,
-        state: formData.state,
-        country: formData.country,
-        createdAt: new Date().toISOString(),
-        verified: false,
-        status: 'Active',
-      };
-
-      // Save user
-      existingUsers.push(newUser);
-      localStorage.setItem('jmpUsers', JSON.stringify(existingUsers));
-
-      // Set as current user
-      localStorage.setItem('jmpCurrentUser', JSON.stringify(newUser));
-
+      const response = await api.signup(formData);
+      saveAuthSession({ user: response.user, token: response.token, refreshToken: response.refreshToken });
       setSuccessMessage('Account created successfully! Redirecting...');
-      
-      // Redirect based on account type
       setTimeout(() => {
-        if (formData.accountType === 'seller') {
-          window.location.href = './verification.html';
-        } else {
-          window.location.href = '/marketplace';
-        }
-      }, 1500);
-
+        return navigate(formData.accountType === 'seller' ? '/seller' : '/marketplace');
+      }, 900);
     } catch (error) {
       console.error('Signup error:', error);
-      setErrors({ general: 'An error occurred during signup. Please try again.' });
+      setErrors({ general: error.message || 'An error occurred during signup. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -150,7 +108,6 @@ const Signup = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* First Name */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">First Name</label>
             <input
@@ -164,7 +121,6 @@ const Signup = () => {
             {errors.firstName && <p className="text-red-400 text-sm mt-1">{errors.firstName}</p>}
           </div>
 
-          {/* Last Name */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">Last Name</label>
             <input
@@ -178,7 +134,6 @@ const Signup = () => {
             {errors.lastName && <p className="text-red-400 text-sm mt-1">{errors.lastName}</p>}
           </div>
 
-          {/* Account Type */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">Account Type</label>
             <select
@@ -194,7 +149,6 @@ const Signup = () => {
             {errors.accountType && <p className="text-red-400 text-sm mt-1">{errors.accountType}</p>}
           </div>
 
-          {/* Email */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">Email Address</label>
             <input
@@ -208,7 +162,6 @@ const Signup = () => {
             {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
           </div>
 
-          {/* Phone Number */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">Phone Number</label>
             <input
@@ -222,12 +175,9 @@ const Signup = () => {
             {errors.phone && <p className="text-red-400 text-sm mt-1">{errors.phone}</p>}
           </div>
 
-          {/* WhatsApp - Show for sellers (required) or buyers (optional) */}
           {formData.accountType && (
             <div>
-              <label className="block text-gray-300 text-sm font-semibold mb-2">
-                WhatsApp Number {formData.accountType === 'seller' ? '(Required)' : '(Optional)'}
-              </label>
+              <label className="block text-gray-300 text-sm font-semibold mb-2">WhatsApp Number {formData.accountType === 'seller' ? '(Required)' : '(Optional)'}</label>
               <input
                 type="tel"
                 name="whatsapp"
@@ -240,7 +190,6 @@ const Signup = () => {
             </div>
           )}
 
-          {/* Street Address */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">Street Address</label>
             <input
@@ -254,7 +203,6 @@ const Signup = () => {
             {errors.streetAddress && <p className="text-red-400 text-sm mt-1">{errors.streetAddress}</p>}
           </div>
 
-          {/* City */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">City</label>
             <input
@@ -268,7 +216,6 @@ const Signup = () => {
             {errors.city && <p className="text-red-400 text-sm mt-1">{errors.city}</p>}
           </div>
 
-          {/* State/Province */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">State/Province</label>
             <input
@@ -281,7 +228,6 @@ const Signup = () => {
             />
           </div>
 
-          {/* Country */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">Country</label>
             <input
@@ -294,7 +240,6 @@ const Signup = () => {
             />
           </div>
 
-          {/* Password */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">Password</label>
             <input
@@ -308,7 +253,6 @@ const Signup = () => {
             {errors.password && <p className="text-red-400 text-sm mt-1">{errors.password}</p>}
           </div>
 
-          {/* Confirm Password */}
           <div>
             <label className="block text-gray-300 text-sm font-semibold mb-2">Confirm Password</label>
             <input
@@ -322,7 +266,6 @@ const Signup = () => {
             {errors.confirmPassword && <p className="text-red-400 text-sm mt-1">{errors.confirmPassword}</p>}
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
@@ -333,7 +276,7 @@ const Signup = () => {
         </form>
 
         <p className="text-gray-400 text-center mt-6">
-          Already have an account? <a href="/#login" className="text-[#D4AF37] hover:underline">Login</a>
+          Already have an account? <Link to="/login" className="text-[#D4AF37] hover:underline">Login</Link>
         </p>
       </div>
     </div>
@@ -341,5 +284,6 @@ const Signup = () => {
 };
 
 export default Signup;
+
 
 

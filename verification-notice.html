@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./responsive.css" />
     <style>
         body { font-family: serif; }
         .logo img {
@@ -40,17 +41,17 @@
                 if (user) {
                     setCurrentUser(JSON.parse(user));
                 } else {
-                    window.location.href = 'index.html';
+                    window.location.href = './index.html';
                 }
                 setLoading(false);
             }, []);
 
             const handleBack = () => {
-                window.location.href = 'profile.html';
+                window.location.href = "./profile.html";
             };
 
             const handleNext = () => {
-                window.location.href = 'verification.html';
+                window.location.href = "./verification.html";
             };
 
             // Check if user has at least 1 approved product
@@ -193,4 +194,5 @@
     </script>
 </body>
 </html>
+
 

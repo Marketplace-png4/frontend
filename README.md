@@ -36,7 +36,7 @@ Click the "J" logo 4 times within 2 seconds to navigate to the admin login page.
 
 - Build command: `npm run build`
 - Publish directory: `dist`
-- Set environment variable: `VITE_API_URL=https://your-backend-url.com`
+- Set environment variable: `VITE_API_URL=https://new-backend-nlxi.onrender.com`
 - Ensure `public/_redirects` contains `/* /index.html 200` for React routing.
 
 ### Backend (Render / Railway)

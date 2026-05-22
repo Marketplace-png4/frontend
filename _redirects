@@ -1,0 +1,27 @@
+# Direct file routing - these pages have their own files
+/marketplace.html     /marketplace.html     200
+/admin.html           /admin.html           200
+/profile.html         /profile.html         200
+/verification.html    /verification.html    200
+/verification-notice.html /verification-notice.html 200
+/settings.html        /settings.html        200
+/inbox.html           /inbox.html           200
+/marketplace          /marketplace.html     200
+/admin                /admin.html           200
+/profile              /profile.html         200
+/verification         /verification.html    200
+/verification-notice  /verification-notice.html 200
+/settings             /settings.html        200
+/inbox                /inbox.html           200
+
+# Preserve static assets
+/image/*              /image/:splat         200
+/public/*             /public/:splat        200
+/src/*                /src/:splat           200
+
+# Main index and client-side routing
+/index.html           /index.html           200
+/                     /index.html           200
+
+# Catch-all for hash-based routing (HashRouter)
+/*                    /index.html           200

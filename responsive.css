@@ -1,0 +1,45 @@
+/* Global responsive helpers for mobile screens */
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: serif;
+}
+img, svg, video, canvas, picture {
+  max-width: 100%;
+  height: auto;
+}
+input, textarea, select, button {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+button {
+  min-width: 0;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  white-space: normal;
+}
+@media (max-width: 767px) {
+  .responsive-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .admin-mobile-nav {
+    width: 100% !important;
+  }
+  .admin-mobile-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .responsive-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .responsive-table table {
+    min-width: 100%;
+  }
+}

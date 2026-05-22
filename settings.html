@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./responsive.css" />
     <style>
         body { font-family: serif; }
         .logo img {
@@ -113,9 +114,14 @@
         ];
 
         // Sound utility functions for notifications
-        const playNotificationSound = (soundId) => {
+        const playNotificationSound = (soundId, customSoundData) => {
             try {
-                // Create audio context for sound playback
+                if (soundId === 'custom' && customSoundData) {
+                    const audio = new Audio(customSoundData);
+                    audio.play().catch((e) => console.log('Custom sound playback failed:', e));
+                    return;
+                }
+
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
@@ -123,16 +129,13 @@
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
                 
-                // Different sound patterns based on selection
                 if (soundId === 'sound1') {
-                    // Bell sound (higher pitch)
                     oscillator.frequency.value = 800;
                     gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
                     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
                     oscillator.start(audioContext.currentTime);
                     oscillator.stop(audioContext.currentTime + 0.5);
                 } else if (soundId === 'sound2') {
-                    // Chime sound (two tones)
                     oscillator.frequency.value = 600;
                     gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
                     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
@@ -145,7 +148,6 @@
                     oscillator2.start(audioContext.currentTime + 0.35);
                     oscillator2.stop(audioContext.currentTime + 0.65);
                 } else if (soundId === 'sound3') {
-                    // Alert sound (beeping)
                     oscillator.frequency.value = 1000;
                     gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
                     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
@@ -176,7 +178,6 @@
         // Trigger notification with sound/speech
         const triggerNotification = (type, isAdmin = false, userSettings = null) => {
             if (isAdmin) {
-                // Admin notifications with text-to-speech
                 const messages = {
                     newUser: 'new user just signed up',
                     productApproval: 'A product for approval is waiting for you',
@@ -185,9 +186,21 @@
                     sellerRequest: 'A new worker want to join your team approve the seller product',
                 };
                 speakNotification(messages[type] || 'New notification');
-            } else if (userSettings && userSettings.sound && userSettings.selectedSound) {
-                // Regular user notifications with sound
-                playNotificationSound(userSettings.selectedSound);
+            } else if (userSettings && userSettings.sound) {
+                if (userSettings.useDeviceSound) {
+                    try {
+                        new Notification('Joshua Luxury Store', {
+                            body: 'You have a new notification.',
+                            icon: 'image/my-logo.png',
+                        });
+                    } catch (e) {
+                        console.log('Notification dispatch failed:', e);
+                    }
+                } else if (userSettings.selectedSound === 'custom' && userSettings.customSoundData) {
+                    playNotificationSound('custom', userSettings.customSoundData);
+                } else if (userSettings.selectedSound) {
+                    playNotificationSound(userSettings.selectedSound);
+                }
             }
         };
 
@@ -202,7 +215,8 @@
             
             // Theme
             const [theme, setTheme] = useState('dark');
-            const [themeMode, setThemeMode] = useState('dark'); // dark, light, device
+            const [themeMode, setThemeMode] = useState('dark'); // saved / applied theme
+            const [selectedThemeMode, setSelectedThemeMode] = useState('dark'); // pending selection
             
             // Language & Currency
             const [language, setLanguage] = useState('en');
@@ -216,7 +230,11 @@
                 promotional: false,
                 sound: true,
                 selectedSound: 'sound1',
+                useDeviceSound: false,
+                customSoundData: '',
             });
+            const [sessions, setSessions] = useState([]);
+            const [currentSessionId, setCurrentSessionId] = useState('');
 
             // Security
             const [passwordData, setPasswordData] = useState({
@@ -239,6 +257,35 @@
             // Transaction History
             const [transactions, setTransactions] = useState([]);
 
+            const getDeviceSessionKey = (email) => `jmpDeviceSessions_${email.toLowerCase()}`;
+            const loadDeviceSessions = (email) => {
+                const list = JSON.parse(localStorage.getItem(getDeviceSessionKey(email)) || '[]');
+                setSessions(list);
+                setCurrentSessionId(localStorage.getItem('jmpCurrentSessionId') || '');
+            };
+            const saveDeviceSessions = (email, updatedSessions) => {
+                localStorage.setItem(getDeviceSessionKey(email), JSON.stringify(updatedSessions));
+                setSessions(updatedSessions);
+            };
+            const handleDeviceSignOut = (sessionId) => {
+                if (!currentUser) return;
+                const updatedSessions = sessions.map(session =>
+                    session.id === sessionId ? { ...session, active: false } : session
+                );
+                saveDeviceSessions(currentUser.email, updatedSessions);
+
+                if (sessionId === currentSessionId) {
+                    localStorage.removeItem('jmpCurrentUser');
+                    localStorage.removeItem('jmpCurrentSessionId');
+                    setSuccessMessage('Signed out from this device. Redirecting to login...');
+                    setTimeout(() => {
+                        window.location.href = './index.html#/login';
+                    }, 1200);
+                } else {
+                    setSuccessMessage('Signed out from selected device.');
+                }
+            };
+
             useEffect(() => {
                 const user = localStorage.getItem('jmpCurrentUser');
                 if (user) {
@@ -247,6 +294,7 @@
                     setEditableUser(userData);
                     loadSettings(userData.email, userData);
                     loadTransactionHistory(userData.email);
+                    loadDeviceSessions(userData.email);
                     setLoading(false);
                 } else {
                     // Redirect to login page without showing loading screen
@@ -260,7 +308,7 @@
                 detectBiometricCapability().then(available => {
                     setBiometricAvailable(available);
                     if (available && currentUser) {
-                        const bioEnabled = localStorage.getItem(`jmpBiometric_${currentUser.email}`);
+                        const bioEnabled = localStorage.getItem(`jmpBiometric_${currentUser.email.toLowerCase()}`);
                         setBiometricEnabled(!!bioEnabled);
                     }
                 });
@@ -304,7 +352,9 @@
             const loadSettings = (email, userData) => {
                 try {
                     const settings = JSON.parse(localStorage.getItem(`jmpSettings_${email}`) || '{}');
-                    setThemeMode(settings.themeMode || 'dark');
+                    const savedMode = settings.themeMode || 'dark';
+                    setThemeMode(savedMode);
+                    setSelectedThemeMode(savedMode);
                     setLanguage(settings.language || 'en');
                     setCurrency(settings.currency || 'NGN');
                     setNotifications(prev => ({ ...prev, ...settings.notifications }));
@@ -336,7 +386,7 @@
 
             const saveSettings = () => {
                 const settings = {
-                    themeMode,
+                    themeMode: selectedThemeMode,
                     language,
                     currency,
                     notifications,
@@ -346,10 +396,11 @@
                     lastUpdated: new Date().toISOString(),
                 };
                 localStorage.setItem(`jmpSettings_${currentUser.email}`, JSON.stringify(settings));
+                setThemeMode(selectedThemeMode);
                 
                 // Dispatch settings events for other pages to listen
                 window.dispatchEvent(new CustomEvent('currencyChanged', { detail: { currency } }));
-                window.dispatchEvent(new CustomEvent('themeModeChanged', { detail: { themeMode } }));
+                window.dispatchEvent(new CustomEvent('themeModeChanged', { detail: { themeMode: selectedThemeMode } }));
                 
                 setSuccessMessage('Settings saved successfully!');
                 setTimeout(() => setSuccessMessage(''), 3000);
@@ -377,6 +428,20 @@
                     setErrorMessage('Failed to save account changes');
                     console.error('Error saving account:', e);
                 }
+            };
+
+            const handleProfilePictureUpload = (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                if (!file.type.startsWith('image/')) {
+                    setErrorMessage('Please upload a valid image file.');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => {
+                    setEditableUser(prev => ({ ...prev, profilePicture: reader.result }));
+                };
+                reader.readAsDataURL(file);
             };
 
             const handleChangePassword = () => {
@@ -416,6 +481,28 @@
                 }
             };
 
+            const bufferToBase64Url = (buffer) => {
+                return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+                    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            };
+
+            const base64UrlToBuffer = (base64url) => {
+                const padding = '='.repeat((4 - (base64url.length % 4)) % 4);
+                const base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
+                const rawData = atob(base64);
+                const output = new Uint8Array(rawData.length);
+                for (let i = 0; i < rawData.length; ++i) {
+                    output[i] = rawData.charCodeAt(i);
+                }
+                return output;
+            };
+
+            const generateRandomBuffer = (length) => {
+                const buffer = new Uint8Array(length);
+                window.crypto.getRandomValues(buffer);
+                return buffer;
+            };
+
             const handleBiometricSetup = async () => {
                 if (!biometricAvailable) {
                     setErrorMessage('Biometric authentication is not available on this device');
@@ -423,21 +510,43 @@
                 }
 
                 try {
-                    // Simulate biometric confirmation (in production, use WebAuthn API)
-                    const confirmed = window.confirm('Please confirm with your fingerprint or face. (Simulated for demo)');
-                    if (confirmed) {
-                        localStorage.setItem(`jmpBiometric_${currentUser.email}`, 'enabled');
+                    const challenge = generateRandomBuffer(32);
+                    const userId = new TextEncoder().encode(currentUser.email.toLowerCase());
+                    const publicKey = {
+                        challenge,
+                        rp: { name: 'Joshua Luxury Store', id: window.location.hostname },
+                        user: {
+                            id: userId,
+                            name: currentUser.email,
+                            displayName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email,
+                        },
+                        pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+                        authenticatorSelection: {
+                            authenticatorAttachment: 'platform',
+                            userVerification: 'required',
+                        },
+                        timeout: 60000,
+                        attestation: 'direct',
+                    };
+
+                    const credential = await navigator.credentials.create({ publicKey });
+                    if (credential && credential.rawId) {
+                        const rawId = bufferToBase64Url(credential.rawId);
+                        localStorage.setItem(`jmpBiometric_${currentUser.email.toLowerCase()}`, rawId);
                         setBiometricEnabled(true);
                         setSuccessMessage('Biometric authentication enabled!');
                         setTimeout(() => setSuccessMessage(''), 3000);
+                    } else {
+                        setErrorMessage('Biometric setup did not complete successfully.');
                     }
                 } catch (error) {
-                    setErrorMessage('Biometric setup failed: ' + error.message);
+                    console.error('Biometric setup error:', error);
+                    setErrorMessage('Biometric setup failed: ' + (error.message || 'Please try again.'));
                 }
             };
 
             const handleDisableBiometric = () => {
-                localStorage.removeItem(`jmpBiometric_${currentUser.email}`);
+                localStorage.removeItem(`jmpBiometric_${currentUser.email.toLowerCase()}`);
                 setBiometricEnabled(false);
                 setSuccessMessage('Biometric authentication disabled');
                 setTimeout(() => setSuccessMessage(''), 3000);
@@ -457,8 +566,11 @@
             };
 
             const handleLogoutAllDevices = () => {
-                // Clear all device tokens/sessions
+                if (!currentUser) return;
+                const updatedSessions = sessions.map(session => ({ ...session, active: false }));
+                saveDeviceSessions(currentUser.email, updatedSessions);
                 localStorage.removeItem('jmpCurrentUser');
+                localStorage.removeItem('jmpCurrentSessionId');
                 setSuccessMessage('Logged out from all devices. Redirecting to login...');
                 setTimeout(() => {
                     window.location.href = './index.html#/login';
@@ -487,16 +599,29 @@
                 <div className="min-h-screen bg-[#0b0b0b] text-white">
                     {/* Header */}
                     <header className="bg-[#111111] border-b border-[#D4AF37] px-6 py-4">
-                        <div className="max-w-7xl mx-auto flex items-center justify-between">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
                                 <div className="flex flex-col items-center logo">
                                     <img src="image/my-logo.png" alt="Joshua Luxury Store Logo" />
                                     <div className="text-sm font-bold text-[#D4AF37]">Joshua Luxury Store</div>
                                 </div>
                             </div>
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-full overflow-hidden border-2 border-[#D4AF37] bg-[#111111]">
+                                    <img
+                                        src={currentUser.profilePicture || 'image/my-logo.png'}
+                                        alt="Profile"
+                                        className="h-full w-full object-cover"
+                                    />
+                                </div>
+                                <div className="text-left hidden sm:block">
+                                    <p className="text-sm text-gray-400">Signed in as</p>
+                                    <p className="font-semibold">{currentUser.firstName || currentUser.email}</p>
+                                </div>
+                            </div>
                             <div className="flex items-center gap-3">
                                 <button
-                                    onClick={() => window.location.href = './Marketplace.html'}
+                                    onClick={() => window.location.href = './marketplace.html'}
                                     className="border border-[#D4AF37] text-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37] hover:text-black transition-colors"
                                 >
                                     Back to Marketplace
@@ -579,9 +704,32 @@
                                 {/* Account Settings */}
                                 {activeTab === 'account' && (
                                     <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8 space-y-6">
-                                        <div className="flex justify-between items-center">
-                                            <h2 className="text-2xl font-bold text-[#D4AF37]">Account Information</h2>
-                                            <div className="flex gap-3">
+<div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-[#D4AF37] bg-[#111111]">
+                                    <img
+                                        src={editableUser.profilePicture || currentUser.profilePicture || 'image/my-logo.png'}
+                                        alt="Profile"
+                                        className="h-full w-full object-cover"
+                                    />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-bold text-[#D4AF37]">Account Information</h2>
+                                    <p className="text-gray-400 text-sm">Upload a profile picture and it will appear in your settings header.</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-3 items-center">
+                                {isEditingAccount && (
+                                    <label className="inline-flex items-center gap-2 cursor-pointer rounded-full border border-[#D4AF37] px-4 py-2 text-sm text-[#D4AF37] hover:bg-[#222] transition-colors">
+                                        Upload Photo
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleProfilePictureUpload}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                )}
                                                 {!isEditingAccount ? (
                                                     <button
                                                         onClick={() => setIsEditingAccount(true)}
@@ -608,15 +756,6 @@
                                                         </button>
                                                     </>
                                                 )}
-                                                <button
-                                                    onClick={() => {
-                                                        localStorage.removeItem('jmpCurrentUser');
-                                                        window.location.href = './index.html#/login';
-                                                    }}
-                                                    className="bg-red-600 text-white px-4 py-2 rounded-full hover:bg-red-700 transition-colors text-sm font-semibold"
-                                                >
-                                                    Logout
-                                                </button>
                                             </div>
                                         </div>
                                         
@@ -680,6 +819,19 @@
                                                 />
                                             </div>
                                             <div className="col-span-2">
+                                                <label className="flex items-center gap-3 text-gray-300 text-sm font-semibold mb-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={editableUser.publicRating ?? currentUser.publicRating ?? true}
+                                                        onChange={(e) => isEditingAccount && setEditableUser({ ...editableUser, publicRating: e.target.checked })}
+                                                        disabled={!isEditingAccount}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span>Show my ratings publicly</span>
+                                                </label>
+                                                <p className="text-gray-400 text-sm mt-1">Allow your ratings and reviews to be visible on your public profile.</p>
+                                            </div>
+                                            <div className="col-span-2">
                                                 <label className="block text-gray-300 text-sm font-semibold mb-2">Street Address</label>
                                                 <input
                                                     type="text"
@@ -735,8 +887,8 @@
                                                         type="radio"
                                                         name="theme"
                                                         value="dark"
-                                                        checked={themeMode === 'dark'}
-                                                        onChange={() => setThemeMode('dark')}
+                                                        checked={selectedThemeMode === 'dark'}
+                                                        onChange={() => setSelectedThemeMode('dark')}
                                                         className="w-4 h-4"
                                                     />
                                                     <span>Dark Mode (Default)</span>
@@ -746,8 +898,8 @@
                                                         type="radio"
                                                         name="theme"
                                                         value="light"
-                                                        checked={themeMode === 'light'}
-                                                        onChange={() => setThemeMode('light')}
+                                                        checked={selectedThemeMode === 'light'}
+                                                        onChange={() => setSelectedThemeMode('light')}
                                                         className="w-4 h-4"
                                                     />
                                                     <span>Light Mode</span>
@@ -757,13 +909,14 @@
                                                         type="radio"
                                                         name="theme"
                                                         value="device"
-                                                        checked={themeMode === 'device'}
-                                                        onChange={() => setThemeMode('device')}
+                                                        checked={selectedThemeMode === 'device'}
+                                                        onChange={() => setSelectedThemeMode('device')}
                                                         className="w-4 h-4"
                                                     />
                                                     <span>Use Device Settings</span>
                                                 </label>
                                             </div>
+                                            <p className="text-gray-400 text-sm mt-4">Theme will apply only after you click Save App Settings.</p>
                                         </div>
 
                                         {/* Language */}
@@ -852,22 +1005,64 @@
                                                     <span>Enable Sound</span>
                                                 </label>
                                                 {notifications.sound && (
-                                                    <div className="space-y-3">
-                                                        <select
-                                                            value={notifications.selectedSound}
-                                                            onChange={(e) => setNotifications({ ...notifications, selectedSound: e.target.value })}
-                                                            className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
-                                                        >
-                                                            {soundNotifications.map(sound => (
-                                                                <option key={sound.id} value={sound.id}>{sound.name}</option>
-                                                            ))}
-                                                        </select>
-                                                        <button
-                                                            onClick={() => playNotificationSound(notifications.selectedSound)}
-                                                            className="w-full bg-[#D4AF37] text-black py-2 rounded-lg font-semibold hover:bg-opacity-80 transition-colors"
-                                                        >
-                                                            🔊 Test Sound
-                                                        </button>
+                                                    <div className="space-y-4">
+                                                        <label className="flex items-center gap-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={notifications.useDeviceSound}
+                                                                onChange={(e) => setNotifications({ ...notifications, useDeviceSound: e.target.checked, selectedSound: e.target.checked ? 'sound1' : notifications.selectedSound })}
+                                                                className="w-4 h-4"
+                                                            />
+                                                            <span>Use device default notification sound</span>
+                                                        </label>
+                                                        {!notifications.useDeviceSound && (
+                                                            <div className="space-y-3">
+                                                                <select
+                                                                    value={notifications.selectedSound}
+                                                                    onChange={(e) => setNotifications({ ...notifications, selectedSound: e.target.value })}
+                                                                    className="w-full bg-[#222] border border-[#D4AF37] text-white px-4 py-3 rounded-lg"
+                                                                >
+                                                                    {soundNotifications.map(sound => (
+                                                                        <option key={sound.id} value={sound.id}>{sound.name}</option>
+                                                                    ))}
+                                                                    <option value="custom">Upload Phone Notification Sound</option>
+                                                                </select>
+                                                                {notifications.selectedSound === 'custom' && (
+                                                                    <div className="space-y-3">
+                                                                        <input
+                                                                            type="file"
+                                                                            accept="audio/*"
+                                                                            onChange={(e) => {
+                                                                                const file = e.target.files?.[0];
+                                                                                if (!file) return;
+                                                                                if (!file.type.startsWith('audio/')) {
+                                                                                    setErrorMessage('Please upload a valid audio file.');
+                                                                                    return;
+                                                                                }
+                                                                                const reader = new FileReader();
+                                                                                reader.onload = () => {
+                                                                                    setNotifications(prev => ({ ...prev, customSoundData: reader.result, selectedSound: 'custom' }));
+                                                                                };
+                                                                                reader.readAsDataURL(file);
+                                                                            }}
+                                                                            className="w-full text-sm text-gray-300 file:text-black file:bg-[#D4AF37] file:rounded-full file:px-3 file:py-2"
+                                                                        />
+                                                                        {notifications.customSoundData && (
+                                                                            <p className="text-gray-400 text-sm">Custom notification sound uploaded and ready to use.</p>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => playNotificationSound(notifications.selectedSound, notifications.customSoundData)}
+                                                                    className="w-full bg-[#D4AF37] text-black py-2 rounded-lg font-semibold hover:bg-opacity-80 transition-colors"
+                                                                >
+                                                                    🔊 Test Sound
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {notifications.useDeviceSound && (
+                                                            <p className="text-gray-400 text-sm">Your device will use the default notification sound when available.</p>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -960,6 +1155,37 @@
                                                 <p className="text-gray-300">Your device does not support biometric authentication</p>
                                             </div>
                                         )}
+
+                                        {/* Device Sessions */}
+                                        <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
+                                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">Signed in Devices</h3>
+                                            <p className="text-gray-300 mb-4">Manage devices where you are signed in and sign out from a specific session.</p>
+                                            {sessions.length > 0 ? (
+                                                <div className="space-y-4">
+                                                    {sessions.map(session => (
+                                                        <div key={session.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#0f0f0f] border border-gray-800 rounded-2xl p-4">
+                                                            <div>
+                                                                <p className="font-semibold text-white">
+                                                                    {session.deviceName}{session.id === currentSessionId ? ' • This device' : ''}
+                                                                </p>
+                                                                <p className="text-gray-400 text-sm">Last seen: {new Date(session.lastSeen).toLocaleString()}</p>
+                                                                <p className={`text-sm ${session.active ? 'text-green-400' : 'text-red-400'}`}>
+                                                                    {session.active ? 'Active' : 'Inactive'}
+                                                                </p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleDeviceSignOut(session.id)}
+                                                                className="self-start sm:self-auto rounded-full bg-red-600 text-white px-4 py-2 hover:bg-red-700 transition-colors"
+                                                            >
+                                                                {session.id === currentSessionId ? 'Sign out from this device' : 'Sign out device'}
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-400">No active device sessions found yet.</p>
+                                            )}
+                                        </div>
 
                                         {/* Logout All Devices */}
                                         <div className="bg-[#111111] border border-[#D4AF37] rounded-2xl p-8">
@@ -1165,10 +1391,6 @@
                                                 <p>Your information is handled securely and used only for verification, security, and operational purposes.</p>
                                             </div>
 
-                                            <div>
-                                                <h4 className="text-[#D4AF37] font-bold">Contact Support</h4>
-                                                <p>For disputes or inquiries, contact us through the official support channels within the application.</p>
-                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -1183,6 +1405,7 @@
     </script>
 </body>
 </html>
+
 
 
 

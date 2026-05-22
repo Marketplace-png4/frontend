@@ -11,6 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/react-router@6/umd/react-router.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-router-dom@6/umd/react-router-dom.development.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./responsive.css" />
     <style>
         body {
             font-family: serif;
@@ -68,15 +69,9 @@
             speakNotification(messages[type] || 'New notification');
         };
 
-        const mockUsers = [
-            { id: '1', name: 'John Doe', email: 'john@example.com', status: 'Active', joined: '2024-01-15' },
-            { id: '2', name: 'Jane Smith', email: 'jane@example.com', status: 'Active', joined: '2024-02-20' },
-            { id: '3', name: 'Bob Johnson', email: 'bob@example.com', status: 'Suspended', joined: '2024-03-10' },
-        ];
-
         const getUsers = () => {
             const stored = localStorage.getItem('jmpUsers');
-            return stored ? JSON.parse(stored) : mockUsers;
+            return stored ? JSON.parse(stored) : [];
         };
 
         const mockOrders = [
@@ -85,15 +80,9 @@
             { id: 'ORD003', user: 'Bob Johnson', product: 'Velvet Heritage Bag', status: 'Delivered', amount: '₦3,400', date: '2024-04-25' },
         ];
 
-        const mockProducts = [
-            { id: '1', title: 'Sovereign Gold Watch', status: 'Approved', category: 'Watches', price: '₦12,800' },
-            { id: '2', title: 'Palatial Diamond Ring', status: 'Pending', category: 'Jewelry', price: '₦18,600' },
-            { id: '3', title: 'Velvet Heritage Bag', status: 'Rejected', category: 'Bags', price: '₦3,400' },
-        ];
-
         const getProducts = () => {
             const stored = localStorage.getItem('jmpProducts');
-            return stored ? JSON.parse(stored) : mockProducts;
+            return stored ? JSON.parse(stored) : [];
         };
 
         const AdminDashboard = () => {
@@ -122,6 +111,7 @@
             const [showProductDetailsModal, setShowProductDetailsModal] = useState(false);
             const [showBanConfirmation, setShowBanConfirmation] = useState(false);
             const [banPin, setBanPin] = useState('');
+            const [expandedSellerDetails, setExpandedSellerDetails] = useState({});
             const [showBanPinModal, setShowBanPinModal] = useState(false);
             const [banTargetUser, setBanTargetUser] = useState(null);
             const [notificationPopup, setNotificationPopup] = useState(null);
@@ -538,6 +528,11 @@
                 return allUsers.filter(u => u.role === 'seller' && u.sellerStatus === 'pending_approval');
             };
 
+            const getApprovedSellers = () => {
+                const allUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
+                return allUsers.filter(u => u.role === 'seller' && u.sellerStatus === 'approved');
+            };
+
             const approveSeller = (sellerEmail) => {
                 const allUsers = JSON.parse(localStorage.getItem('jmpUsers') || '[]');
                 const userIndex = allUsers.findIndex(u => u.email === sellerEmail);
@@ -691,7 +686,7 @@
                         </div>
                     )}
                     <header className="bg-[#111111] border-b border-[#D4AF37] px-6 py-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                             <div className="flex flex-col items-center logo">
                                 <img src="image/my-logo.png" alt="Joshua Luxury Store Logo" />
                                 <div className="text-sm font-bold text-[#D4AF37]">Joshua Luxury Store</div>
@@ -705,8 +700,8 @@
                         </div>
                     </header>
 
-                    <div className="flex">
-                        <nav className="w-64 bg-[#111111] min-h-screen border-r border-[#D4AF37]">
+                    <div className="flex flex-col md:flex-row">
+                        <nav className="w-full md:w-64 bg-[#111111] md:min-h-screen min-h-0 border-t border-b md:border-t-0 md:border-r border-[#D4AF37] admin-mobile-nav">
                             <div className="p-6">
                                 <h2 className="text-lg font-semibold text-[#D4AF37] mb-4">Management</h2>
                                 <div className="space-y-2">
@@ -761,7 +756,7 @@
                             {activeSection === 'users' && (
                                 <div>
                                     <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Users</h2>
-                                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl overflow-hidden">
+                                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl overflow-hidden responsive-table">
                                                 <div className="p-4 border-b border-[#D4AF37]/20">
                                                     <input
                                                         type="text"
@@ -771,7 +766,7 @@
                                                         className="w-full bg-[#0b0b0b] border border-[#333] text-gray-300 px-4 py-2 rounded-lg"
                                                     />
                                                 </div>
-                                        <table className="w-full">
+                                        <table className="w-full min-w-max">
                                             <thead className="bg-[#D4AF37] text-black">
                                                 <tr>
                                                     <th className="px-6 py-3 text-left">First Name</th>
@@ -820,8 +815,8 @@
                             {activeSection === 'products' && (
                                 <div>
                                     <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Products</h2>
-                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl overflow-hidden">
-                                        <table className="w-full">
+                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl overflow-hidden responsive-table">
+                                        <table className="w-full min-w-max">
                                             <thead className="bg-[#D4AF37] text-black">
                                                 <tr>
                                                     <th className="px-6 py-3 text-left">Title</th>
@@ -885,7 +880,7 @@
                             {activeSection === 'orders' && (
                                 <div>
                                     <h2 className="text-3xl font-bold text-[#D4AF37] mb-6">Orders</h2>
-                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl overflow-hidden">
+                                    <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl overflow-hidden responsive-table">
                                         <div className="p-4 border-b border-[#D4AF37]/20">
                                             <input
                                                 type="text"
@@ -895,7 +890,7 @@
                                                 className="w-full bg-[#0b0b0b] border border-[#333] text-gray-300 px-4 py-2 rounded-lg"
                                             />
                                         </div>
-                                        <table className="w-full">
+                                        <table className="w-full min-w-max">
                                             <thead className="bg-[#D4AF37] text-black">
                                                 <tr>
                                                     <th className="px-6 py-3 text-left">Order ID</th>
@@ -1169,16 +1164,19 @@
                                                         </span>
                                                     </div>
                                                     
-                                                    <div className="bg-[#0f0f0f] rounded-2xl p-6 mb-6 text-gray-300 space-y-3">
-                                                        <div>
-                                                            <p><strong className="text-[#D4AF37]">Full Name:</strong> {seller.firstName} {seller.lastName}</p>
-                                                            <p><strong className="text-[#D4AF37]">Email:</strong> {seller.email}</p>
-                                                            <p><strong className="text-[#D4AF37]">Phone Number:</strong> {seller.phone}</p>
-                                                            <p><strong className="text-[#D4AF37]">Business WhatsApp:</strong> {seller.businessWhatsApp}</p>
-                                                            <p><strong className="text-[#D4AF37]">Business Address:</strong> {seller.businessAddress}</p>
-                                                            <p><strong className="text-[#D4AF37]">Signup Role:</strong> {seller.role === 'seller' ? 'Seller' : 'Buyer'}</p>
-                                                            <p><strong className="text-[#D4AF37]">Seller Status:</strong> {seller.sellerStatus}</p>
-                                                        </div>
+                                                    <div className="mb-6">
+                                                        <button
+                                                            onClick={() => setExpandedSellerDetails(prev => ({ ...prev, [seller.email]: !prev[seller.email] }))}
+                                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#D4AF37] text-black font-semibold hover:bg-opacity-90 transition-colors"
+                                                        >
+                                                            {expandedSellerDetails[seller.email] ? 'Hide Details' : 'View Details'}
+                                                        </button>
+                                                        {expandedSellerDetails[seller.email] && (
+                                                            <div className="bg-[#0f0f0f] rounded-2xl p-6 mt-4 text-gray-300">
+                                                                <p><strong className="text-[#D4AF37]">Business WhatsApp:</strong> {seller.businessWhatsApp || 'N/A'}</p>
+                                                                <p><strong className="text-[#D4AF37]">Business Location:</strong> {seller.businessAddress || 'N/A'}</p>
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     <div className="flex gap-3">
@@ -1204,6 +1202,40 @@
                                             <p className="text-gray-400 text-sm">All seller requests have been processed</p>
                                         </div>
                                     )}
+
+                                    <div className="mt-12">
+                                        <h3 className="text-2xl font-semibold text-[#D4AF37] mb-4">Approved Sellers</h3>
+                                        {getApprovedSellers().length > 0 ? (
+                                            <div className="space-y-4">
+                                                {getApprovedSellers().map((seller) => (
+                                                    <div key={seller.email} className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6">
+                                                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                                            <div>
+                                                                <h4 className="text-xl font-semibold text-[#D4AF37]">{seller.firstName} {seller.lastName}</h4>
+                                                                <p className="text-gray-400 text-sm">{seller.email}</p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => setExpandedSellerDetails(prev => ({ ...prev, [seller.email]: !prev[seller.email] }))}
+                                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#D4AF37] text-black font-semibold hover:bg-opacity-90 transition-colors"
+                                                            >
+                                                                {expandedSellerDetails[seller.email] ? 'Hide Details' : 'View Details'}
+                                                            </button>
+                                                        </div>
+                                                        {expandedSellerDetails[seller.email] && (
+                                                            <div className="bg-[#0f0f0f] rounded-2xl p-4 mt-4 text-gray-300">
+                                                                <p><strong className="text-[#D4AF37]">Business WhatsApp:</strong> {seller.businessWhatsApp || 'N/A'}</p>
+                                                                <p><strong className="text-[#D4AF37]">Business Location:</strong> {seller.businessAddress || 'N/A'}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6 text-center">
+                                                <p className="text-gray-300">No approved sellers yet.</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
@@ -1363,11 +1395,21 @@
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
+                                            {selectedUser.profilePicture && (
+                                                <div className="mb-4 w-32 h-32 rounded-full overflow-hidden border-2 border-[#D4AF37]">
+                                                    <img src={selectedUser.profilePicture} alt="User Profile" className="w-full h-full object-cover" />
+                                                </div>
+                                            )}
                                             <p><strong className="text-[#D4AF37]">First Name:</strong> {selectedUser.firstName || selectedUser.name?.split(' ')[0]}</p>
                                             <p><strong className="text-[#D4AF37]">Last Name:</strong> {selectedUser.lastName || selectedUser.name?.split(' ')[1]}</p>
                                             <p><strong className="text-[#D4AF37]">Username:</strong> {selectedUser.username}</p>
                                             <p><strong className="text-[#D4AF37]">Email:</strong> {selectedUser.email}</p>
                                             <p><strong className="text-[#D4AF37]">Phone:</strong> {selectedUser.phone || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">WhatsApp:</strong> {selectedUser.whatsapp || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">Street Address:</strong> {selectedUser.streetAddress || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">City:</strong> {selectedUser.city || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">State:</strong> {selectedUser.state || 'N/A'}</p>
+                                            <p><strong className="text-[#D4AF37]">Country:</strong> {selectedUser.country || 'N/A'}</p>
                                             <p><strong className="text-[#D4AF37]">Status:</strong> {selectedUser.status || 'Active'}</p>
                                             <p><strong className="text-[#D4AF37]">Joined:</strong> {selectedUser.joined || new Date().toISOString().split('T')[0]}</p>
                                             <p><strong className="text-[#D4AF37]">Verified:</strong> {selectedUser.verified ? 'Yes' : 'No'}</p>
@@ -1491,62 +1533,8 @@
 
         const Footer = () => (
             <footer className="py-8 px-4 border-t border-[#D4AF37] border-opacity-20 bg-[#0b0b0b]">
-                <div className="max-w-6xl mx-auto text-center">
-                    <h3 className="text-2xl font-bold text-[#D4AF37] mb-4">Help & Support</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">Instagram</h4>
-                            <a
-                                href="https://www.instagram.com/joshua_luxury_store?igsh=MWVnODBjb2FoYmd1eA=="
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Follow on Instagram
-                            </a>
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">TikTok</h4>
-                            <a
-                                href="https://www.tiktok.com/@joshua_luxury_store?_r=1&_t=ZS-96FtF8a6NHz"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Follow on TikTok
-                            </a>
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">WhatsApp</h4>
-                            <a
-                                href="https://wa.me/09124378138"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Contact via WhatsApp
-                            </a>
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">Email</h4>
-                            <a
-                                href="mailto:oluwapelumif0@gmail.com"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Send Email
-                            </a>
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">Urgent</h4>
-                            <a
-                                href="tel:09151888340"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Call Now
-                            </a>
-                        </div>
-                    </div>
-                    <p className="text-gray-300">Support available during working days, response within 24 hours.</p>
+                <div className="max-w-6xl mx-auto text-center text-gray-400">
+                    <p className="text-sm">© Joshua Luxury Store. Admin dashboard only.</p>
                 </div>
             </footer>
         );

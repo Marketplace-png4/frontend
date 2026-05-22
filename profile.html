@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./responsive.css" />
     <style>
         body { font-family: serif; }
         .logo img {
@@ -214,7 +215,7 @@
                             </div>
                             <div className="flex items-center gap-4">
                                 <button
-                                    onClick={() => window.location.href = 'index.html#/inbox'}
+                                    onClick={() => window.location.href = './index.html#/inbox'}
                                     className="relative border border-[#D4AF37] text-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37] hover:text-black transition-colors"
                                 >
                                     📬 Inbox
@@ -225,7 +226,7 @@
                                     )}
                                 </button>
                                 <button
-                                    onClick={() => window.location.href = './Marketplace.html'}
+                                    onClick={() => window.location.href = './marketplace.html'}
                                     className="border border-[#D4AF37] text-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37] hover:text-black transition-colors"
                                 >
                                     Back to Marketplace
@@ -373,7 +374,7 @@
                             </div>
 
                             {/* Buttons */}
-                            <div className="flex gap-4 pt-6 border-t border-[#D4AF37]">
+                            <div className="flex flex-col md:flex-row gap-4 pt-6 border-t border-[#D4AF37]">
                                 <button
                                     onClick={handleSave}
                                     className="flex-1 bg-[#D4AF37] text-black py-3 rounded-lg font-bold text-lg hover:bg-opacity-80 transition-colors"
@@ -417,7 +418,7 @@
                                     </button>
                                 ) : (
                                     <button
-                                        onClick={() => window.location.href = 'verification-notice.html'}
+                                        onClick={() => window.location.href = "./verification-notice.html"}
                                         className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-blue-700 transition-colors"
                                     >
                                         Get Verified
@@ -506,5 +507,7 @@
     </script>
 </body>
 </html>
+
+
 
 

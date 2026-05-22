@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./responsive.css" />
     <style>
         body { font-family: serif; }
         .logo img {
@@ -182,7 +183,7 @@
                 saveCart(currentUser.email, []);
 
                 alert('Order placed successfully! You will be notified when ready for pickup.');
-                window.location.href = './Marketplace.html';
+                window.location.href = './marketplace.html';
             };
 
             if (loading) return <div className="text-center pt-20">Loading...</div>;
@@ -197,7 +198,7 @@
                                 <div className="text-sm font-bold text-[#D4AF37]">Joshua Luxury Store</div>
                             </div>
                             <button
-                                onClick={() => window.location.href = './Marketplace.html'}
+                                onClick={() => window.location.href = './marketplace.html'}
                                 className="border border-[#D4AF37] text-[#D4AF37] px-4 py-2 rounded-full hover:bg-[#D4AF37] hover:text-black transition-colors"
                             >
                                 Back to Marketplace
@@ -306,7 +307,7 @@
                             <div className="text-center py-20 bg-[#111111] border border-[#D4AF37] rounded-3xl">
                                 <p className="text-gray-300 text-2xl mb-8">Your cart is empty</p>
                                 <button
-                                    onClick={() => window.location.href = './Marketplace.html'}
+                                    onClick={() => window.location.href = './marketplace.html'}
                                     className="bg-[#D4AF37] text-black px-8 py-4 rounded-full font-bold text-lg hover:bg-opacity-80 transition-colors"
                                 >
                                     Start Shopping
@@ -322,6 +323,7 @@
     </script>
 </body>
 </html>
+
 
 
 

@@ -21,6 +21,7 @@
         }
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./responsive.css" />
     <style>
         @keyframes wave {
             0%, 100% { background-position: 0% 50%; }
@@ -143,8 +144,14 @@
         };
 
         // Sound utility functions for notifications
-        const playNotificationSound = (soundId) => {
+        const playNotificationSound = (soundId, customSoundData) => {
             try {
+                if (soundId === 'custom' && customSoundData) {
+                    const audio = new Audio(customSoundData);
+                    audio.play().catch((e) => console.log('Custom sound playback failed:', e));
+                    return;
+                }
+
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
@@ -209,8 +216,21 @@
                     sellerRequest: 'A new worker want to join your team approve the seller product',
                 };
                 speakNotification(messages[type] || 'New notification');
-            } else if (userSettings && userSettings.sound && userSettings.selectedSound) {
-                playNotificationSound(userSettings.selectedSound);
+            } else if (userSettings && userSettings.sound) {
+                if (userSettings.useDeviceSound) {
+                    try {
+                        new Notification('Joshua Luxury Store', {
+                            body: 'You have a new notification.',
+                            icon: 'image/my-logo.png',
+                        });
+                    } catch (e) {
+                        console.log('Notification dispatch failed:', e);
+                    }
+                } else if (userSettings.selectedSound === 'custom' && userSettings.customSoundData) {
+                    playNotificationSound('custom', userSettings.customSoundData);
+                } else if (userSettings.selectedSound) {
+                    playNotificationSound(userSettings.selectedSound);
+                }
             }
         };
 
@@ -293,7 +313,7 @@
             const [themeMode, setThemeMode] = useState(globalThemeMode || 'dark');
             const [userProducts, setUserProducts] = useState([]);
             const [showAddProduct, setShowAddProduct] = useState(false);
-            const [formData, setFormData] = useState({ title: '', description: '', price: '', category: '', subcategory: '', images: [], additionalDetails: '', pickupLocation: '', deliveryFee: 500 });
+            const [formData, setFormData] = useState({ title: '', description: '', price: '', category: '', subcategory: '', images: [], additionalDetails: '' });
             const [orders, setOrders] = useState([]);
             const [messages, setMessages] = useState([]);
             const [notificationPopup, setNotificationPopup] = useState(null);
@@ -417,7 +437,7 @@
                     const msgList = JSON.parse(msgs);
                     const userMsgs = msgList
                         .filter(m => m.recipientEmail === email)
-                        .map(m => ({ ...m, read: m.read ?? false }))
+                        .map(m => ({ ...m, read: m.read ?? true }))
                         .sort((a, b) => parseFloat(a.id) - parseFloat(b.id));
                     setMessages(userMsgs);
                     const latest = userMsgs[userMsgs.length - 1];
@@ -475,7 +495,7 @@
                         const msgList = JSON.parse(event.newValue || '[]');
                         const userMsgs = msgList
                             .filter(m => m.recipientEmail === currentUser.email)
-                            .map(m => ({ ...m, read: m.read ?? false }))
+                            .map(m => ({ ...m, read: m.read ?? true }))
                             .sort((a, b) => parseFloat(a.id) - parseFloat(b.id));
                         setMessages(userMsgs);
                         const latest = userMsgs[userMsgs.length - 1];
@@ -724,8 +744,8 @@
                     return;
                 }
                 e.preventDefault();
-                if (!formData.title || !formData.description || !formData.price || !formData.category || !formData.subcategory) {
-                    alert('Please complete all fields including category and subcategory');
+                if (!formData.title || !formData.description || !formData.price || !formData.category || !formData.subcategory || !formData.additionalDetails) {
+                    alert('Please complete all fields including additional details, category, and subcategory');
                     return;
                 }
 
@@ -744,6 +764,9 @@
                     }
                 }
 
+                const pickupLocation = 'New Yidi Road, Irewolede, Ilorin, Kwara state';
+                const deliveryFee = 500;
+
                 const newProduct = {
                     id: Date.now().toString(),
                     title: formData.title,
@@ -753,8 +776,8 @@
                     category: formData.category,
                     subcategory: formData.subcategory,
                     images: images,
-                    pickupLocation: formData.pickupLocation || '',
-                    deliveryFee: formData.deliveryFee || 500,
+                    pickupLocation,
+                    deliveryFee,
                     userEmail: currentUser.email,
                     userName: `${currentUser.firstName} ${currentUser.lastName}`,
                     status: 'Pending',
@@ -767,7 +790,7 @@
                 localStorage.setItem('jmpProducts', JSON.stringify(productList));
 
                 setUserProducts([...userProducts, newProduct]);
-                setFormData({ title: '', description: '', price: '', images: [], additionalDetails: '', pickupLocation: '', deliveryFee: 500 });
+                setFormData({ title: '', description: '', price: '', category: '', subcategory: '', images: [], additionalDetails: '' });
                 setShowAddProduct(false);
                 alert('Product submitted successfully. Waiting for admin approval.');
             };
@@ -837,7 +860,7 @@
                         <>
                     {/* Top Navigation Bar */}
                     <header className="bg-[#111111] border-b border-[#D4AF37] px-6 py-4">
-                        <div className="max-w-7xl mx-auto flex items-center justify-between">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
                             <div className="flex flex-col items-center logo">
                                 <img src="image/my-logo.png" alt="Joshua Luxury Store Logo" />
                                 <div className="text-sm font-bold text-[#D4AF37]">Joshua Luxury Store</div>
@@ -999,19 +1022,12 @@
                                             </div>
                                         )}
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Additional Details (optional)</label>
-                                            <textarea value={formData.additionalDetails} onChange={(e) => setFormData({...formData, additionalDetails: e.target.value})} rows="3" className="w-full px-3 py-2 bg-gray-800 border border-[#D4AF37] rounded-md text-white" placeholder="Color, size, material, serial numbers, etc (optional)"></textarea>
+                                            <label className="block text-sm font-medium text-gray-300 mb-2">Additional Details (required)</label>
+                                            <textarea value={formData.additionalDetails} onChange={(e) => setFormData({...formData, additionalDetails: e.target.value})} rows="3" className="w-full px-3 py-2 bg-gray-800 border border-[#D4AF37] rounded-md text-white" placeholder="Color, size, material, serial numbers, etc"></textarea>
                                         </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Pickup Location</label>
-                                            <input type="text" value={formData.pickupLocation} onChange={(e) => setFormData({...formData, pickupLocation: e.target.value})} placeholder="Pickup address or location" className="w-full px-3 py-2 bg-gray-800 border border-[#D4AF37] rounded-md text-white" />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Delivery Fee (₦)</label>
-                                            <input type="number" value={formData.deliveryFee} onChange={(e) => setFormData({...formData, deliveryFee: Number(e.target.value)})} placeholder="500" className="w-full px-3 py-2 bg-gray-800 border border-[#D4AF37] rounded-md text-white" />
-                                            <p className="text-xs text-gray-400 mt-1">Default is ₦500 added to cart and orders.</p>
+                                        <div className="bg-[#0b0b0b] border border-[#333] rounded-2xl p-4">
+                                            <p className="text-gray-300">Pickup location and delivery fee are assigned automatically after product submission.</p>
                                         </div>
                                         <div className="flex gap-3 mt-6">
                                             <button type="submit" className="flex-1 bg-[#D4AF37] text-black py-2 rounded-full font-semibold hover:bg-opacity-80">Post Product</button>
@@ -1521,6 +1537,8 @@
                 saveCart(currentUser.email, newCart);
             };
 
+            const [touchStartPositions, setTouchStartPositions] = useState({});
+
             const removeFromCart = (productId) => {
                 if (isRestricted) {
                     restrictedAlert();
@@ -1529,6 +1547,47 @@
                 const newCart = cart.filter(item => item.id !== productId);
                 setCart(newCart);
                 saveCart(currentUser.email, newCart);
+            };
+
+            const addToWishlist = (product) => {
+                if (isRestricted) {
+                    restrictedAlert();
+                    return;
+                }
+                const wish = getWishlist(currentUser.email);
+                const exists = wish.some(fav => fav.id === product.id);
+                if (!exists) {
+                    const newWishlist = [...wish, product];
+                    saveWishlist(currentUser.email, newWishlist);
+                }
+                removeFromCart(product.id);
+                alert('Moved item to wishlist');
+            };
+
+            const handleCartTouchStart = (itemId, e) => {
+                const touch = e.touches[0];
+                setTouchStartPositions(prev => ({ ...prev, [itemId]: { x: touch.clientX, y: touch.clientY } }));
+            };
+
+            const handleCartTouchEnd = (item, e) => {
+                const touch = e.changedTouches[0];
+                const start = touchStartPositions[item.id];
+                if (!start) return;
+                const deltaX = touch.clientX - start.x;
+                const deltaY = touch.clientY - start.y;
+                const threshold = 60;
+                if (Math.abs(deltaX) > threshold && Math.abs(deltaY) < 80) {
+                    if (deltaX > 0) {
+                        removeFromCart(item.id);
+                    } else {
+                        addToWishlist(item);
+                    }
+                }
+                setTouchStartPositions(prev => {
+                    const next = { ...prev };
+                    delete next[item.id];
+                    return next;
+                });
             };
 
             const deliveryFee = 500;
@@ -1613,7 +1672,12 @@
                         {cart.length > 0 ? (
                             <div className="space-y-6">
                                 {cart.map((item) => (
-                                    <div key={item.id} className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6 flex flex-col gap-6 md:flex-row">
+                                    <div
+                                        key={item.id}
+                                        className="bg-[#111111] border border-[#D4AF37] rounded-3xl p-6 flex flex-col gap-6 md:flex-row"
+                                        onTouchStart={(e) => handleCartTouchStart(item.id, e)}
+                                        onTouchEnd={(e) => handleCartTouchEnd(item, e)}
+                                    >
                                         <div className="w-full md:w-24 h-24 bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0">
                                             {item.images && item.images.length > 0 ? (
                                                 <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover rounded-lg" />
@@ -1711,6 +1775,8 @@
                 }
             }, []);
 
+            const [touchStartPositions, setTouchStartPositions] = useState({});
+
             const removeFromFavorites = (productId) => {
                 if (isRestricted) {
                     restrictedAlert();
@@ -1738,7 +1804,34 @@
                 }
                 const newCart = [...cart, { ...product, quantity: 1 }];
                 saveCart(currentUser.email, newCart);
-                alert('Added to cart!');
+                removeFromFavorites(product.id);
+                alert('Added to cart and removed from wishlist!');
+            };
+
+            const handleFavoriteTouchStart = (productId, e) => {
+                const touch = e.touches[0];
+                setTouchStartPositions(prev => ({ ...prev, [productId]: { x: touch.clientX, y: touch.clientY } }));
+            };
+
+            const handleFavoriteTouchEnd = (product, e) => {
+                const touch = e.changedTouches[0];
+                const start = touchStartPositions[product.id];
+                if (!start) return;
+                const deltaX = touch.clientX - start.x;
+                const deltaY = touch.clientY - start.y;
+                const threshold = 60;
+                if (Math.abs(deltaX) > threshold && Math.abs(deltaY) < 80) {
+                    if (deltaX > 0) {
+                        removeFromFavorites(product.id);
+                    } else {
+                        addToCart(product);
+                    }
+                }
+                setTouchStartPositions(prev => {
+                    const next = { ...prev };
+                    delete next[product.id];
+                    return next;
+                });
             };
 
             return (
@@ -1766,7 +1859,12 @@
                                 {favorites.map((product) => {
                                     const isOwner = product.userEmail === currentUser.email;
                                     return (
-                                        <div key={product.id} className="rounded-3xl overflow-hidden border border-[#D4AF37] bg-[#111111] shadow-xl">
+                                        <div
+                                            key={product.id}
+                                            className="rounded-3xl overflow-hidden border border-[#D4AF37] bg-[#111111] shadow-xl"
+                                            onTouchStart={(e) => handleFavoriteTouchStart(product.id, e)}
+                                            onTouchEnd={(e) => handleFavoriteTouchEnd(product, e)}
+                                        >
                                             <div className="h-48 bg-gray-800 flex items-center justify-center relative">
                                                 {product.images && product.images.length > 0 ? (
                                                     <img src={product.images[0]} alt={product.title} className="w-full h-full object-cover" />
@@ -2161,67 +2259,82 @@
             );
         };
 
-        const Footer = () => (
-            <footer className="py-8 px-4 border-t border-[#D4AF37] border-opacity-20 bg-[#0b0b0b]">
-                <div className="max-w-6xl mx-auto text-center">
-                    <h3 className="text-2xl font-bold text-[#D4AF37] mb-4">Help & Support</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">Instagram</h4>
-                            <a
-                                href="https://www.instagram.com/joshua_luxury_store?igsh=MWVnODBjb2FoYmd1eA=="
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Follow on Instagram
-                            </a>
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">TikTok</h4>
-                            <a
-                                href="https://www.tiktok.com/@joshua_luxury_store?_r=1&_t=ZS-96FtF8a6NHz"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Follow on TikTok
-                            </a>
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">WhatsApp</h4>
-                            <a
-                                href="https://wa.me/09124378138"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Contact via WhatsApp
-                            </a>
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">Email</h4>
-                            <a
-                                href="mailto:oluwapelumif0@gmail.com"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Send Email
-                            </a>
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-semibold text-white mb-2">Urgent</h4>
-                            <a
-                                href="tel:09151888340"
-                                className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
-                            >
-                                Call Now
-                            </a>
-                        </div>
+        const Footer = () => {
+            const [showSupport, setShowSupport] = useState(false);
+
+            return (
+                <footer className="py-8 px-4 border-t border-[#D4AF37] border-opacity-20 bg-[#0b0b0b]">
+                    <div className="max-w-6xl mx-auto text-center">
+                        <button
+                            onClick={() => setShowSupport((prev) => !prev)}
+                            className="mx-auto mb-6 px-6 py-3 bg-[#D4AF37] text-black font-semibold rounded-full hover:bg-opacity-90 transition-colors"
+                        >
+                            {showSupport ? 'Hide Support Details' : 'Contact Support'}
+                        </button>
+
+                        {showSupport && (
+                            <div className="space-y-6">
+                                <h3 className="text-2xl font-bold text-[#D4AF37]">Help & Support</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+                                    <div>
+                                        <h4 className="text-lg font-semibold text-white mb-2">Instagram</h4>
+                                        <a
+                                            href="https://www.instagram.com/joshua_luxury_store?igsh=MWVnODBjb2FoYmd1eA=="
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                                        >
+                                            Follow on Instagram
+                                        </a>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-semibold text-white mb-2">TikTok</h4>
+                                        <a
+                                            href="https://www.tiktok.com/@joshua_luxury_store?_r=1&_t=ZS-96FtF8a6NHz"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                                        >
+                                            Follow on TikTok
+                                        </a>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-semibold text-white mb-2">WhatsApp</h4>
+                                        <a
+                                            href="https://wa.me/09124378138"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                                        >
+                                            Contact via WhatsApp
+                                        </a>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-semibold text-white mb-2">Email</h4>
+                                        <a
+                                            href="mailto:Help_JLS@outlook.com"
+                                            className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                                        >
+                                            Send Email
+                                        </a>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-semibold text-white mb-2">Urgent</h4>
+                                        <a
+                                            href="tel:09151888340"
+                                            className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-semibold hover:bg-opacity-80 transition-colors"
+                                        >
+                                            Call Now
+                                        </a>
+                                    </div>
+                                </div>
+                                <p className="text-gray-300">Support available during working days, response within 24 hours.</p>
+                            </div>
+                        )}
                     </div>
-                    <p className="text-gray-300">Support available during working days, response within 24 hours.</p>
-                </div>
-            </footer>
-        );
+                </footer>
+            );
+        };
 
         const App = () => {
             console.log('App component rendering');

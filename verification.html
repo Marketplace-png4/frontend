@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./responsive.css" />
     <style>
         body { font-family: serif; }
         .logo img {
@@ -178,7 +179,7 @@
             };
 
             const handleBack = () => {
-                window.location.href = 'profile.html';
+                window.location.href = "./profile.html";
             };
 
             if (loading) return <div className="text-center pt-20">Loading...</div>;
@@ -214,7 +215,7 @@
                             <h2 className="text-3xl font-bold text-green-400 mb-4">Verification Submitted!</h2>
                             <p className="text-gray-300 mb-8">You've successfully submitted verification. Your request is now waiting for admin approval.</p>
                             <button
-                                onClick={() => window.location.href = 'Marketplace.html'}
+                                onClick={() => window.location.href = "./marketplace.html"}
                                 className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors"
                             >
                                 Back to Marketplace
@@ -561,4 +562,5 @@
     </script>
 </body>
 </html></content>
+
 
